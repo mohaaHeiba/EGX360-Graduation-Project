@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "221446793884",
+    "project_id": "egx360-notifs",
+    "storage_bucket": "egx360-notifs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:221446793884:android:8cf3b737811917c2b2db59",
+        "android_client_info": {
+          "package_name": "com.egx.egx"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYMiMEJHXWHnHP-pggNEV-rqzq7PW8oOc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,46 @@
+Analyzing community...                                          
+
+   info • Don't invoke 'print' in production code • lib/features/community/data/datasources/community_remote_data_source.dart:26:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/data/datasources/community_remote_data_source.dart:43:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/data/datasources/community_remote_data_source.dart:55:7 • avoid_print
+   info • Unnecessary braces in a string interpolation • lib/features/community/data/datasources/community_remote_data_source.dart:55:33 • unnecessary_brace_in_string_interps
+   info • Don't invoke 'print' in production code • lib/features/community/data/datasources/community_remote_data_source.dart:59:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/data/repositories/community_repository_impl.dart:25:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/data/repositories/community_repository_impl.dart:36:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:43:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:45:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:48:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:94:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:100:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:127:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/controller/community_controller.dart:140:7 • avoid_print
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:27:62 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:33:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:83:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:110:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:161:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:211:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:243:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:256:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:323:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:390:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:424:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:454:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_desktop.dart:473:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_mobile.dart:164:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_mobile.dart:169:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/pages/community_page_mobile.dart:175:44 • deprecated_member_use
+   info • Unnecessary instance of 'Container' • lib/features/community/presentation/widgets/build_post_card.dart:30:14 • avoid_unnecessary_containers
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:59:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:93:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:153:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:154:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:236:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:238:60 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:282:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/build_post_card.dart:306:42 • deprecated_member_use
+   info • Don't invoke 'print' in production code • lib/features/community/presentation/widgets/posts_list_widget.dart:17:7 • avoid_print
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/posts_list_widget.dart:50:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/community/presentation/widgets/shimmer_post_card.dart:29:32 • deprecated_member_use
+
+42 issues found. (ran in 2.5s)

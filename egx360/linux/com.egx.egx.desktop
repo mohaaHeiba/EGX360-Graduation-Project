@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=EGX360
+Comment=Egyptian Stock Exchange Application
+Exec=egx %u
+Icon=com.egx.egx
+Terminal=false
+Type=Application
+Categories=Finance;Office;
+MimeType=x-scheme-handler/io.supabase.flutter;

@@ -1,0 +1,23 @@
+{
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "egx360-notifs",
+                    "appId": "1:221446793884:android:8cf3b737811917c2b2db59",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "egx360-notifs",
+                    "configurations": {
+                        "android": "1:221446793884:android:8cf3b737811917c2b2db59",
+                        "ios": "1:221446793884:ios:62bec9346860b27eb2db59",
+                        "web": "1:221446793884:web:3182a77da8e69ac2b2db59"
+                    }
+                }
+            }
+        }
+    }
+}
