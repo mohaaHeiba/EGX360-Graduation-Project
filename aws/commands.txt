@@ -1,0 +1,8 @@
+ chmod 400 MyNewsBotKey.pem
+
+ connect with server
+ ssh -i "MyNewsBotKey.pem" ubuntu@51.21.191.162
+
+
+ download anythings in server with my on pc
+ scp -i "MyNewsBotKey.pem" -r ubuntu@51.21.191.162:/home/ubuntu/news_bot .
