@@ -2,26 +2,23 @@ import time
 import feedparser
 import trafilatura
 import re
-import random
 import pandas as pd
 import os
-from difflib import SequenceMatcher 
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from dateutil import parser
 from urllib.parse import quote
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================================================================
-# 1. Config & Local Data
+# 1. Config & Local Data (EGX30 Index)
 # ==============================================================================
 CSV_FILE = "stock_news.csv"
 
-# قائمة الـ 12 سهم بتوعك (تأكد من مطابقة الأسماء والأرقام للي في الداتابيز عندك)
+# قائمة أسهم مؤشر EGX30 (أكبر وأنشط 30 شركة في البورصة المصرية)
 EGX_STOCKS = [
     {'id': 1, 'symbol': 'TMGH', 'name': 'مجموعة طلعت مصطفى'},
     {'id': 2, 'symbol': 'COMI', 'name': 'البنك التجاري الدولي'},
@@ -33,20 +30,49 @@ EGX_STOCKS = [
     {'id': 8, 'symbol': 'ETEL', 'name': 'المصرية للاتصالات'},
     {'id': 9, 'symbol': 'EXPA', 'name': 'البنك المصري لتنمية الصادرات'},
     {'id': 10, 'symbol': 'HRHO', 'name': 'إي اف جي القابضة'},
-    {'id': 11, 'symbol': 'IRON', 'name': 'حديد عز'},
+    {'id': 11, 'symbol': 'ESRS', 'name': 'حديد عز'}, 
     {'id': 12, 'symbol': 'SWDY', 'name': 'السويدي إليكتريك'},
+    {'id': 13, 'symbol': 'PHDC', 'name': 'بالم هيلز للتعمير'},
+    {'id': 14, 'symbol': 'MASR', 'name': 'مدينة مصر للإسكان'},
+    {'id': 15, 'symbol': 'BTFH', 'name': 'بلتون القابضة'},
+    {'id': 16, 'symbol': 'ORHD', 'name': 'أوراسكوم للتنمية مصر'},
+    {'id': 17, 'symbol': 'MFPC', 'name': 'موبكو للأسمدة'},
+    {'id': 18, 'symbol': 'SKPC', 'name': 'سيدي كرير للبتروكيماويات'},
+    {'id': 19, 'symbol': 'HELI', 'name': 'مصر الجديدة للإسكان'},
+    {'id': 20, 'symbol': 'AMOC', 'name': 'الإسكندرية للزيوت المعدنية'},
+    {'id': 21, 'symbol': 'ISPH', 'name': 'ابن سينا فارما'},
+    {'id': 22, 'symbol': 'JUFO', 'name': 'جهينة للصناعات الغذائية'},
+    {'id': 23, 'symbol': 'ADIB', 'name': 'مصرف أبو ظبي الإسلامي'},
+    {'id': 24, 'symbol': 'CIRA', 'name': 'سيرا للتعليم'},
+    {'id': 25, 'symbol': 'DOMT', 'name': 'دومتي'},
+    {'id': 26, 'symbol': 'ORAS', 'name': 'أوراسكوم كونستراكشون'},
+    {'id': 27, 'symbol': 'SUGR', 'name': 'الدلتا للسكر'},
+    {'id': 28, 'symbol': 'MTIE', 'name': 'إم إم جروب'},
+    {'id': 29, 'symbol': 'CCAP', 'name': 'القلعة للاستشارات المالية'},
+    {'id': 30, 'symbol': 'ALCN', 'name': 'الإسكندرية لتداول الحاويات'},
 ]
+
+# متغير عالمي لتخزين اللينكات وتجنب التكرار بسرعة الصاروخ
+EXISTING_URLS = set()
 
 # ==============================================================================
 # 2. Helpers (Cleaners & CSV Logic)
 # ==============================================================================
 
 def init_csv():
-    """إنشاء ملف CSV بالهيدرز لو مش موجود"""
+    global EXISTING_URLS
     if not os.path.exists(CSV_FILE):
         df = pd.DataFrame(columns=['id', 'stock_id', 'title', 'description', 'content', 'url', 'source', 'published_at', 'created_at'])
-        df.to_csv(CSV_FILE, index=False, encoding='utf-16') # استخدام utf-16 عشان العربي
+        df.to_csv(CSV_FILE, index=False, encoding='utf-16')
         print(f"📁 Created new CSV file: {CSV_FILE}")
+    else:
+        try:
+            df_existing = pd.read_csv(CSV_FILE, encoding='utf-16')
+            if 'url' in df_existing.columns:
+                EXISTING_URLS = set(df_existing['url'].dropna().tolist())
+                print(f"📊 Loaded {len(EXISTING_URLS)} existing URLs from CSV to skip duplicates.")
+        except Exception as e:
+            print(f"⚠️ Error loading existing CSV (might be empty): {e}")
 
 def clean_html(html_content):
     if not html_content: return ""
@@ -115,7 +141,7 @@ def build_smart_query(company_name):
     query = f'"{company_name}" AND (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه)'
     return quote(query)
 
-def is_fresh_news(entry, max_days=365): # زودنا المدة لسنة
+def is_fresh_news(entry, max_days=365): 
     try:
         if hasattr(entry, 'published_parsed'):
             pub_date = datetime(*entry.published_parsed[:6]).replace(tzinfo=timezone.utc)
@@ -125,16 +151,13 @@ def is_fresh_news(entry, max_days=365): # زودنا المدة لسنة
              if pub_date.tzinfo is None: pub_date = pub_date.replace(tzinfo=timezone.utc)
              return (datetime.now(timezone.utc) - pub_date).days <= max_days, pub_date
     except: pass
-    return True, datetime.now()
+    return True, datetime.now(timezone.utc)
 
 def save_news_to_csv(stock_id, title, description, content, url, source, pub_date):
+    global EXISTING_URLS
     try:
-        # قراءة الداتا الحالية للتأكد من عدم التكرار
-        if os.path.exists(CSV_FILE):
-            df_existing = pd.read_csv(CSV_FILE, encoding='utf-16')
-            if url in df_existing['url'].values:
-                print(f"      ⏭️ Already in CSV: {url[:30]}...")
-                return
+        if url in EXISTING_URLS:
+            return
 
         final_description = clean_html(description)
         if final_description.strip() == title.strip(): final_description = ""
@@ -146,9 +169,8 @@ def save_news_to_csv(stock_id, title, description, content, url, source, pub_dat
 
         if not final_content: return 
 
-        # تجهيز السطر الجديد
         new_row = {
-            "id": int(time.time() * 1000), # ID وهمي يعتمد على الوقت
+            "id": int(time.time() * 1000), 
             "stock_id": stock_id,
             "title": title,
             "description": final_description[:500],
@@ -159,9 +181,10 @@ def save_news_to_csv(stock_id, title, description, content, url, source, pub_dat
             "created_at": datetime.now().isoformat()
         }
 
-        # إضافة السطر وحفظ الملف
         df_new = pd.DataFrame([new_row])
         df_new.to_csv(CSV_FILE, mode='a', header=not os.path.exists(CSV_FILE), index=False, encoding='utf-16')
+        
+        EXISTING_URLS.add(url)
         print(f"      ✅ Saved to CSV! ({len(final_content)} chars)")
         
     except Exception as e:
@@ -188,30 +211,33 @@ def resolve_url_with_selenium(google_url, driver):
     except: return google_url
 
 def process_stocks():
-    init_csv()
+    init_csv() 
     driver = setup_stock_driver()
     try:
-        print(f"\n{'='*50}\n🇪🇬 DATASET COLLECTOR STARTED\n{'='*50}")
+        print(f"\n{'='*50}\n🇪🇬 EGX30 MASSIVE DATASET COLLECTOR STARTED 🚀\n{'='*50}")
         for stock in EGX_STOCKS:
             symbol, name_ar, stock_id = stock['symbol'], stock['name'], stock['id']
             encoded_query = build_smart_query(name_ar)
-            # rss_url بتبحث عن 100 خبر لكل سهم
             rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ar&gl=EG&ceid=EG:ar"
 
-            print(f"\n🔎 [{symbol}] Searching for 100 news items...")
+            print(f"\n🔎 [{symbol}] Searching for 100 news items for '{name_ar}'...")
             feed = feedparser.parse(rss_url)
             
-            # ليميت 100 خبر لكل سهم
             entries = feed.entries[:100] 
             print(f"   Found {len(feed.entries)} total, processing top {len(entries)}")
 
             for entry in entries:
                 title = entry.title
-                print(f"\n   📰 Title: {title[:50]}...")
                 
-                # السماح بأخبار قديمة لحد سنة
+                # فحص سريع لعدم التكرار قبل حرق الموارد
+                if entry.link in EXISTING_URLS:
+                     continue
+
                 fresh, pub_date = is_fresh_news(entry, max_days=365) 
+                if not fresh:
+                    continue
                 
+                print(f"\n   📰 Title: {title[:70]}...")
                 print(f"      🚀 Resolving and Scraping...")
                 final_url = resolve_url_with_selenium(entry.link, driver)
 
@@ -231,11 +257,11 @@ def process_stocks():
 
                 save_news_to_csv(stock_id, title, rss_desc, content, final_url, "Google News", pub_date)
             
-            time.sleep(5) # بريك بين الأسهم عشان جوجل ما يعملش بلوك
+            time.sleep(5) 
     finally:
         driver.quit()
 
 if __name__ == "__main__":
     start_time = datetime.now()
     process_stocks()
-    print(f"\n✅ Dataset Collection Finished! Total Time: {datetime.now() - start_time}")
+    print(f"\n✅ EGX30 Dataset Collection Finished! Total Time: {datetime.now() - start_time}")

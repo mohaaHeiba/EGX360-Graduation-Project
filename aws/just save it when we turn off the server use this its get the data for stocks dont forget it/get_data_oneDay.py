@@ -31,7 +31,7 @@ TIMEFRAME_LABEL = "1m"
 START_TIME = datetime.time(10, 0)
 END_TIME = datetime.time(14, 30)
 
-start_date = datetime.date(2026, 2, 18)
+start_date = datetime.date(2026, 2, 26)
 end_date = datetime.date.today()
 
 all_days = pd.date_range(start=start_date, end=end_date)

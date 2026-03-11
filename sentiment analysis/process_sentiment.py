@@ -11,7 +11,7 @@ from cerebras.cloud.sdk import Cerebras
 CEREBRAS_APIKEY = "csk-cmfc5nr8t2tw35cwxt52h2cy54kfypxw4vemkfex9kj6r8vd"
 client = Cerebras(api_key=CEREBRAS_APIKEY)
 
-INPUT_FILE = "stock_news.csv"         
+INPUT_FILE = "stock_news_cleaned.csv"         
 OUTPUT_FILE = "labeled_news_cerebras.csv" 
 BATCH_SIZE = 10                       
 
@@ -30,7 +30,7 @@ def get_ai_sentiments(batch_df):
     4. شراكات إدارة الفنادق (مثل ماندارين أورينتال) أو التوسعات = Positive.
     
     ارجع النتيجة بصيغة JSON Array فقط بهذا الشكل:
-    [{"id": 123, "sentiment_label": "Positive"}]
+    [{"id": "123", "sentiment_label": "Positive"}]
     لا تكتب أي نصوص أخرى أو شروحات.
     
     الأخبار:
@@ -46,7 +46,7 @@ def get_ai_sentiments(batch_df):
                 {"role": "system", "content": "أنت محلل مالي دقيق. تجيب بصيغة JSON فقط دون أي مقدمات."},
                 {"role": "user", "content": prompt}
             ],
-            model="llama3.1-8b", # الموديل المتاح والمضمون لحسابك
+            model="llama3.1-8b", 
             temperature=0.1, 
         )
         
@@ -73,7 +73,7 @@ def main():
         print(f"❌ الملف {INPUT_FILE} مش موجود في المسار الحالي!")
         return
 
-    print("📥 جاري قراءة الملف...")
+    print("📥 جاري قراءة الملف الأصلي...")
     try:
         df = pd.read_csv(INPUT_FILE, encoding='utf-8-sig')
     except:
@@ -82,16 +82,42 @@ def main():
         except:
             df = pd.read_csv(INPUT_FILE, encoding='cp1256')
 
+    # توحيد نوع الـ ID عشان ميحصلش مشاكل في المقارنة
+    df['id'] = df['id'].astype(str)
+
     if 'sentiment_label' not in df.columns:
         df['sentiment_label'] = None
 
-    total_rows = len(df)
-    print(f"🚀 تم العثور على {total_rows} خبر. جاري بدء التحليل الذكي مع Cerebras...")
+    # ==============================================================================
+    # ✨ التعديل الذكي: تخطي الأخبار اللي اتصنفت قبل كده
+    # ==============================================================================
+    if os.path.exists(OUTPUT_FILE):
+        print("🔍 جاري فحص ملف المخرجات لاسترجاع الأخبار المصنفة مسبقاً...")
+        try:
+            df_out = pd.read_csv(OUTPUT_FILE, encoding='utf-8-sig')
+            df_out['id'] = df_out['id'].astype(str) # توحيد نوع الـ ID
+            
+            # فلترة الأخبار اللي خدت تصنيف فعلاً
+            labeled_rows = df_out.dropna(subset=['sentiment_label'])
+            
+            # عمل قاموس (Dictionary) يربط الـ ID بالتصنيف بتاعه
+            labeled_dict = labeled_rows.set_index('id')['sentiment_label'].to_dict()
+            
+            # تطبيق التصنيف القديم على الداتا الجديدة (لو الـ ID موجود)
+            df['sentiment_label'] = df['id'].map(labeled_dict).fillna(df['sentiment_label'])
+            
+            print(f"🔄 تم استرجاع وتخطي {len(labeled_dict)} خبر مصنف مسبقاً!")
+        except Exception as e:
+            print(f"⚠️ مقدرتش أقرأ ملف المخرجات القديم (ممكن يكون فاضي): {e}")
+    # ==============================================================================
 
+    total_rows = len(df)
     unlabeled_idx = df[df['sentiment_label'].isnull()].index
 
+    print(f"🚀 إجمالي الأخبار: {total_rows} | المصنف: {total_rows - len(unlabeled_idx)} | المتبقي للتحليل: {len(unlabeled_idx)}")
+
     if len(unlabeled_idx) == 0:
-         print("✅ جميع الأخبار تم تصنيفها مسبقاً!")
+         print("✅ جميع الأخبار تم تصنيفها مسبقاً! مفيش حاجة تتعمل.")
          return
 
     for i in range(0, len(unlabeled_idx), BATCH_SIZE):
@@ -104,18 +130,16 @@ def main():
         
         if results:
             for item in results:
-                try:
-                    item_id = type(df['id'].iloc[0])(item['id'])
-                    df.loc[df['id'] == item_id, 'sentiment_label'] = item['sentiment_label']
-                except:
-                    pass
+                # تحديث DataFrame بناءً على الـ ID كـ String
+                df.loc[df['id'] == str(item['id']), 'sentiment_label'] = item['sentiment_label']
             
+            # حفظ مستمر
             df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
             print("   ✅ تم حفظ الدفعة بنجاح.")
         
         time.sleep(1)
 
-    print(f"\n🎉 انتهى العمل! الملف النظيف جاهز باسم: {OUTPUT_FILE}")
+    print(f"\n🎉 انتهى العمل! الملف النظيف جاهز ومحدث باسم: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
