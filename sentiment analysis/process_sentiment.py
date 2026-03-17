@@ -1,145 +1,130 @@
 import pandas as pd
-import json
 import time
-import os
 import re
+import os
 from cerebras.cloud.sdk import Cerebras
 
-# ==============================================================================
-# 1. Configuration 
-# ==============================================================================
-CEREBRAS_APIKEY = "csk-cmfc5nr8t2tw35cwxt52h2cy54kfypxw4vemkfex9kj6r8vd"
+# ==========================================
+# 1. Configuration
+# ==========================================
+CEREBRAS_APIKEY = "csk-ywf42kf845xf43crjpphnn9crt28698w8xpkx8ef5p4rdcew"
 client = Cerebras(api_key=CEREBRAS_APIKEY)
 
-INPUT_FILE = "stock_news_cleaned.csv"         
-OUTPUT_FILE = "labeled_news_cerebras.csv" 
-BATCH_SIZE = 10                       
+INPUT_FILE = "labeled_news_cerebras.csv"
+OUTPUT_FILE = "super_refined_news.csv"
+BATCH_SIZE = 5 
 
-# ==============================================================================
-# 2. AI Logic using Cerebras (llama3.1-8b)
-# ==============================================================================
-
-def get_ai_sentiments(batch_df):
+def process_with_ai(batch_df):
+    # لغينا الـ JSON تماماً واستخدمنا نظام الـ Tags (زي الـ XML)
     prompt = """
-    أنت خبير مالي في البورصة المصرية (EGX). قم بتصنيف الأخبار التالية إلى (Positive, Negative, Neutral) بناءً على تأثيرها المباشر على سهم الشركة المذكورة.
+    أنت خبير صياغة تقارير مالية للبورصة المصرية. قم بمعالجة الأخبار التالية.
     
-    القواعد الصارمة جداً:
-    1. أخبار أسعار الدولار، الذهب، التضخم أو الاقتصاد الكلي (بدون ذكر تأثير مباشر للشركة) = Neutral.
-    2. التراجع في الخسائر وتقليصها = Positive.
-    3. أخطاء التداول، إيقاف الأسهم، الغرامات، وهبوط المؤشرات بسبب السهم = Negative.
-    4. شراكات إدارة الفنادق (مثل ماندارين أورينتال) أو التوسعات = Positive.
+    القواعد:
+    1. أعد صياغة الخبر بأسلوب صحفي مالي "كامل ودسم". حافظ على كل الأرقام، أسماء الشركات، أسباب الصعود/الهبوط، والتفاصيل الجوهرية.
+    2. احذف فقط: الإعلانات، الروابط، وأسماء الصحفيين.
+    3. لا تختصر الخبر في جملة واحدة.
     
-    ارجع النتيجة بصيغة JSON Array فقط بهذا الشكل:
-    [{"id": "123", "sentiment_label": "Positive"}]
-    لا تكتب أي نصوص أخرى أو شروحات.
+    يجب أن يكون الرد بهذا التنسيق النصي الصارم لكل خبر (لا تستخدم JSON):
     
-    الأخبار:
+    [START]
+    ID: <رقم الخبر>
+    SENTIMENT: <Positive أو Negative أو Neutral>
+    VALID: <True أو False>
+    ACTION: <keep أو delete>
+    TEXT: <اكتب النص المالي المعالج والمفصل هنا>
+    [END]
     """
     
     for _, row in batch_df.iterrows():
-        content_snippet = str(row.get('content', ''))[:300]
-        prompt += f"\n- ID: {row['id']} | Title: {row['title']} | Content: {content_snippet}\n"
+        # تنظيف مبدئي خفيف عشان الـ Prompt
+        safe_title = str(row['title']).replace('\n', ' ')
+        safe_content = str(row.get('content', '')).replace('\n', ' ')
+        prompt += f"\n--- الخبر الأصلي ---\nID: {row['id']}\nTitle: {safe_title}\nContent: {safe_content[:1500]}\n"
 
     try:
         response = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "أنت محلل مالي دقيق. تجيب بصيغة JSON فقط دون أي مقدمات."},
+                {"role": "system", "content": "You are a financial editor. Always use the exact [START] and [END] block format requested."},
                 {"role": "user", "content": prompt}
             ],
-            model="llama3.1-8b", 
+            model="llama3.1-8b",
             temperature=0.1, 
+            max_tokens=3000, 
         )
         
-        raw_text = response.choices[0].message.content
+        raw_content = response.choices[0].message.content
         
-        json_match = re.search(r'\[.*\]', raw_text, re.DOTALL)
-        if json_match:
-            clean_json = json_match.group(0)
-            return json.loads(clean_json)
-        else:
-            print("   ⚠️ الموديل لم يرجع JSON صالح.")
-            return None
-            
+        results = []
+        # استخراج البيانات باستخدام Regular Expressions قوية جداً
+        blocks = re.findall(r'\[START\](.*?)\[END\]', raw_content, re.DOTALL)
+        
+        for block in blocks:
+            try:
+                # بنبحث عن كل قيمة جوه البلوك
+                item_id = re.search(r'ID:\s*(.+)', block).group(1).strip()
+                sentiment = re.search(r'SENTIMENT:\s*(.+)', block).group(1).strip()
+                valid_str = re.search(r'VALID:\s*(.+)', block).group(1).strip()
+                action = re.search(r'ACTION:\s*(.+)', block).group(1).strip()
+                
+                # النص بياخد كل حاجة بعد كلمة TEXT: لحد آخر البلوك
+                text_match = re.search(r'TEXT:\s*(.*)', block, re.DOTALL)
+                clean_text = text_match.group(1).strip() if text_match else ""
+                
+                is_valid = True if 'True' in valid_str else False
+                
+                results.append({
+                    "id": item_id,
+                    "sentiment": sentiment,
+                    "clean_text": clean_text,
+                    "is_valid": is_valid,
+                    "action": action
+                })
+            except Exception as parse_err:
+                print(f"⚠️ تجاهل بلوك غير مكتمل: {parse_err}")
+                continue # لو خبر واحد باظ، التانيين يكملوا عادي جداً
+                
+        return results
+        
     except Exception as e:
-        print(f"   ⚠️ خطأ في الاتصال بـ Cerebras: {e}")
+        print(f"⚠️ خطأ في الاتصال بالـ API: {e}")
         return None
 
-# ==============================================================================
-# 3. Main Runner
-# ==============================================================================
-
+# ==========================================
+# 2. Main Runner 
+# ==========================================
 def main():
     if not os.path.exists(INPUT_FILE):
-        print(f"❌ الملف {INPUT_FILE} مش موجود في المسار الحالي!")
+        print("❌ الملف الأصلي غير موجود!")
         return
 
-    print("📥 جاري قراءة الملف الأصلي...")
-    try:
-        df = pd.read_csv(INPUT_FILE, encoding='utf-8-sig')
-    except:
-        try:
-            df = pd.read_csv(INPUT_FILE, encoding='utf-16')
-        except:
-            df = pd.read_csv(INPUT_FILE, encoding='cp1256')
-
-    # توحيد نوع الـ ID عشان ميحصلش مشاكل في المقارنة
-    df['id'] = df['id'].astype(str)
-
-    if 'sentiment_label' not in df.columns:
-        df['sentiment_label'] = None
-
-    # ==============================================================================
-    # ✨ التعديل الذكي: تخطي الأخبار اللي اتصنفت قبل كده
-    # ==============================================================================
+    df = pd.read_csv(INPUT_FILE)
+    if 'id' not in df.columns: df['id'] = df.index.astype(str)
+    
+    processed_ids = set()
     if os.path.exists(OUTPUT_FILE):
-        print("🔍 جاري فحص ملف المخرجات لاسترجاع الأخبار المصنفة مسبقاً...")
-        try:
-            df_out = pd.read_csv(OUTPUT_FILE, encoding='utf-8-sig')
-            df_out['id'] = df_out['id'].astype(str) # توحيد نوع الـ ID
-            
-            # فلترة الأخبار اللي خدت تصنيف فعلاً
-            labeled_rows = df_out.dropna(subset=['sentiment_label'])
-            
-            # عمل قاموس (Dictionary) يربط الـ ID بالتصنيف بتاعه
-            labeled_dict = labeled_rows.set_index('id')['sentiment_label'].to_dict()
-            
-            # تطبيق التصنيف القديم على الداتا الجديدة (لو الـ ID موجود)
-            df['sentiment_label'] = df['id'].map(labeled_dict).fillna(df['sentiment_label'])
-            
-            print(f"🔄 تم استرجاع وتخطي {len(labeled_dict)} خبر مصنف مسبقاً!")
-        except Exception as e:
-            print(f"⚠️ مقدرتش أقرأ ملف المخرجات القديم (ممكن يكون فاضي): {e}")
-    # ==============================================================================
+        existing_df = pd.read_csv(OUTPUT_FILE)
+        processed_ids = set(existing_df['id'].astype(str))
+    
+    to_process_df = df[~df['id'].astype(str).isin(processed_ids)]
+    print(f"🚀 متبقي للمعالجة: {len(to_process_df)} من أصل {len(df)}")
 
-    total_rows = len(df)
-    unlabeled_idx = df[df['sentiment_label'].isnull()].index
-
-    print(f"🚀 إجمالي الأخبار: {total_rows} | المصنف: {total_rows - len(unlabeled_idx)} | المتبقي للتحليل: {len(unlabeled_idx)}")
-
-    if len(unlabeled_idx) == 0:
-         print("✅ جميع الأخبار تم تصنيفها مسبقاً! مفيش حاجة تتعمل.")
-         return
-
-    for i in range(0, len(unlabeled_idx), BATCH_SIZE):
-        batch_indices = unlabeled_idx[i : i + BATCH_SIZE]
-        batch_df = df.loc[batch_indices]
+    for i in range(0, len(to_process_df), BATCH_SIZE):
+        batch = to_process_df.iloc[i : i + BATCH_SIZE]
+        print(f"📦 دفعة {i//BATCH_SIZE + 1} | معالجة {len(batch)} أخبار...")
         
-        print(f"📦 جاري معالجة الأخبار من {i+1} إلى {min(i+BATCH_SIZE, len(unlabeled_idx))} من أصل {len(unlabeled_idx)} متبقي...")
+        results = process_with_ai(batch)
         
-        results = get_ai_sentiments(batch_df)
-        
-        if results:
-            for item in results:
-                # تحديث DataFrame بناءً على الـ ID كـ String
-                df.loc[df['id'] == str(item['id']), 'sentiment_label'] = item['sentiment_label']
+        if results and len(results) > 0:
+            results_df = pd.DataFrame(results)
+            header = not os.path.exists(OUTPUT_FILE)
+            results_df.to_csv(OUTPUT_FILE, mode='a', index=False, header=header, encoding='utf-8-sig')
+            print("   ✅ تم الحفظ.")
+        else:
+            print("   ⚠️ لم يتم استخراج بيانات من هذه الدفعة.")
             
-            # حفظ مستمر
-            df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
-            print("   ✅ تم حفظ الدفعة بنجاح.")
-        
-        time.sleep(1)
+        time.sleep(1) # راحة ثانية عشان الـ API ميعملش Rate Limit
 
-    print(f"\n🎉 انتهى العمل! الملف النظيف جاهز ومحدث باسم: {OUTPUT_FILE}")
+    print(f"\n🎉 المهمة تمت بنجاح! الملف جاهز: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
