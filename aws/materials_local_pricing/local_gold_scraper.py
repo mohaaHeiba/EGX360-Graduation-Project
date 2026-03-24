@@ -9,7 +9,9 @@ import re
 # --- 1. Configurations ---
 SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
-SERVICE_ACCOUNT_PATH = "/home/ubuntu/materails_local_pricing/service_account.json"
+# SERVICE_ACCOUNT_PATH = "/home/ubuntu/materails_local_pricing/service_account.json"
+SERVICE_ACCOUNT_PATH = "/home/heiba/EGX360_Graduation_Project/aws/materails_local_pricing/service_account.json"
+
 TABLE_NAME = "material_prices"
 NOTIFICATION_THRESHOLD = 10.0  # تنبيه عند تغير السعر بـ 5 جنيه
 
