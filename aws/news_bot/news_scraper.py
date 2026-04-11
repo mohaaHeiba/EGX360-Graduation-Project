@@ -17,6 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+import os
 
 # ======================= AI Imports =======================
 from cerebras.cloud.sdk import Cerebras
@@ -28,8 +29,9 @@ from transformers import pipeline
 SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
 CEREBRAS_APIKEY = "csk-ywf42kf845xf43crjpphnn9crt28698w8xpkx8ef5p4rdcew"
-
-SERVICE_ACCOUNT_PATH = "service_account.json"
+# بدلاً من SERVICE_ACCOUNT_PATH = "service_account.json"
+base_path = os.path.dirname(os.path.abspath(__file__))
+SERVICE_ACCOUNT_PATH = os.path.join(base_path, "service_account.json")
 
 # تهيئة قواعد البيانات
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -842,7 +844,7 @@ def extract_smart_content(url, html_content):
         text = tag.get_text(separator=" ").strip()
         
         # لو النص مش فاضي، ومقرأناهوش قبل كده، ضيفه
-        if text not in seen_paragraphs or len(text) < 35:
+        if text and text not in seen_paragraphs:
             seen_paragraphs.add(text)
             text_parts.append(text)
             
