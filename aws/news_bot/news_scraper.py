@@ -686,47 +686,46 @@ def scrape_msn(soup):
     return final_text if len(final_text) > 100 else None
 
 def scrape_youm7(soup):
-    """استخراج النص الصافي من موقع اليوم السابع"""
-    # الحاوية الرئيسية للخبر في اليوم السابع
-    content_div = soup.find('div', id='articleBody') or soup.find('div', class_='articleCont')
+    """استخراج النص الصافي من موقع اليوم السابع (يدعم نسخة الويب والـ AMP)"""
+    # ضفنا article-body عشان ندعم روابط الـ AMP
+    content_div = soup.find('div', id='articleBody') or soup.find('div', class_='articleCont') or soup.find('div', class_='article-body')
     
     if not content_div:
         return None
 
-    # 1. تنظيف الفخاخ (إعلانات، أيقونات واتساب وجوجل نيوز، اسم الكاتب)
-    for tag in content_div.find_all(['script', 'style', 'img', 'figure']):
+    # تنظيف الفخاخ (إعلانات، أيقونات، كاتب، كلمات دالة)
+    junk_classes = ['tags', 'writeBy', 'wirte-by', 'img-text', 'breadcumb', 'social-share-bar']
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=re.compile(junk, re.IGNORECASE)):
+            tag.decompose()
+
+    for tag in content_div.find_all(['script', 'style', 'img', 'figure', 'amp-img', 'center']):
         tag.decompose()
 
-    # مسح الروابط الترويجية (جوجل نيوز وواتساب)
+    # مسح الروابط الترويجية 
     for a_tag in content_div.find_all('a'):
         link_text = a_tag.get_text(strip=True)
         if "Google News" in link_text or "واتساب" in link_text:
             a_tag.decompose()
 
-    # مسح إعلانات تابولا وجوجل
     for tag in content_div.find_all('div', id=re.compile(r'taboola|div-gpt-ad')):
         tag.decompose()
 
-    # مسح اسم الكاتب لو موجود
-    for tag in content_div.find_all('span', class_='writeBy'):
+    # مسح اسم الكاتب والتاريخ
+    for tag in content_div.find_all(['span', 'div'], class_=re.compile(r'writeBy|wirte-by|news-date')):
         tag.decompose()
 
-    # 2. تجميع النص الصافي
+    # تجميع النص الصافي
     text_parts = []
-    # هنسحب البراجرافات والعناوين الفرعية
     for tag in content_div.find_all(['p', 'h2', 'h3']):
         text = tag.get_text(separator=" ").strip()
         if text:
             text_parts.append(text)
 
     final_text = "\n\n".join(text_parts)
-    
-    # تنظيف المسافات الفاضية
     final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
     
     return final_text if len(final_text) > 100 else None
-
-
 
 def scrape_alboslanews(soup):
     """استخراج النص الصافي من موقع البوصلة نيوز"""
@@ -843,7 +842,7 @@ def extract_smart_content(url, html_content):
         text = tag.get_text(separator=" ").strip()
         
         # لو النص مش فاضي، ومقرأناهوش قبل كده، ضيفه
-        if text and text not in seen_paragraphs:
+        if text not in seen_paragraphs or len(text) < 35:
             seen_paragraphs.add(text)
             text_parts.append(text)
             
