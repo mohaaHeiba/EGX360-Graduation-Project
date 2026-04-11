@@ -55,18 +55,21 @@ def is_arabic(text):
     return bool(re.search(r'[\u0600-\u06FF]', str(text)))
 
 def process_arabic_with_cerebras(title, content):
-    """استخدام Cerebras لتنظيف الخبر العربي وفلترته وتصنيفه دون أي اختصار"""
+    """استخدام Cerebras لتنظيف الخبر العربي وفلترته وتصنيفه بصرامة تامة"""
     prompt = f"""
-    أنت خبير مالي ومحرر صحفي لأسواق المال. قم بمعالجة الخبر التالي:
-    1. VALID: هل الخبر سليم وله معنى مالي حقيقي؟ (True/False) - لو كان مجرد هراء أو حروف عشوائية أو إعلان اجعلها False.
-    2. SENTIMENT: صنف تأثير الخبر (Positive أو Negative أو Neutral).
-    3. TEXT: قم بتنظيف الخبر من أي إعلانات أو روابط، ولكن إياك أن تختصره أو تقصره. يجب الحفاظ على الخبر كاملاً بجميع تفاصيله وأرقامه ودسامته الأصلية.
+    أنت آلة برمجية صارمة لتنظيف وتصنيف البيانات. لا تمتلك آراء شخصية. لا تقم بكتابة أي مقدمات أو نهايات أو تحليلات.
+    مهمتك محددة في 3 نقاط فقط:
+    1. VALID: هل النص يمثل خبر مقروء ومفهوم؟ (True/False). إذا كان النص عبارة عن حروف عشوائية، أو بيانات ملتصقة ببعضها (مثل: كودالترقيمالشركة)، أو لا يحمل معنى، اكتب False.
+    2. SENTIMENT: صنف الخبر (Positive أو Negative أو Neutral).
+    3. TEXT: أعد كتابة النص الأصلي كما هو تماماً، ولكن احذف منه فقط (الإعلانات، الروابط، الكلمات المفتاحية، جمل مثل "اقرأ أيضا"). 
+    
+    تحذير صارم: ممنوع منعاً باتاً إضافة أي رأي، أو تحليل، أو تلخيص للخبر. النص المنظف يجب أن يكون مطابقاً للأصلي بدون الزيادات الإعلانية.
     
     الخبر الأصلي:
     Title: {title}
     Content: {str(content)[:2500]}
     
-    الرد يجب أن يكون بهذا التنسيق النصي الصارم فقط:
+    يجب أن يكون الرد حصرياً داخل هذا القالب، وبدون أي كلمة قبله أو بعده:
     [START]
     VALID: <True or False>
     SENTIMENT: <Positive or Negative or Neutral>
@@ -76,12 +79,13 @@ def process_arabic_with_cerebras(title, content):
     try:
         response = cerebras_client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a precise financial editor. DO NOT summarize. Use only the [START] and [END] block format."},
+                # غيرنا دور الـ System عشان يبقى آلة مش بني آدم
+                {"role": "system", "content": "You are a strict data extraction machine. ONLY output the requested format. NEVER add opinions, summaries, or conversational text."},
                 {"role": "user", "content": prompt}
             ],
             model="llama3.1-8b",
-            temperature=0.1,
-            max_tokens=3000 # زودنا التوكنز عشان ياخد راحته في الكتابة وميقصش الكلام
+            temperature=0.01, # 👈 قللنا الـ Temperature جداً عشان نلغي الإبداع والتأليف تماماً
+            max_tokens=3000 
         )
         
         raw_text = response.choices[0].message.content
@@ -98,11 +102,11 @@ def process_arabic_with_cerebras(title, content):
             
             return is_valid, sentiment, clean_text
             
+        # لو الـ AI غبي ومردش بالقالب، بنعتبر الخبر سليم وبنرجع النص زي ما هو عشان منخسروش
         return True, "Neutral", content
     except Exception as e:
         print(f"      ⚠️ Cerebras Error: {e}")
         return True, "Neutral", content
-
 def process_english_with_finbert(title, content):
     """استخدام Hugging Face (FinBERT) للأخبار الإنجليزية"""
     text_to_analyze = f"{title}. {content}"
@@ -204,12 +208,23 @@ def clean_and_validate_content(text, description, title):
     text = re.sub(r'\n\s*\n', '\n\n', text)
     return text.strip()
 
-def is_blacklisted(url):
+def is_blacklisted(url, title=""):
+    url_lower = url.lower()
+    
     bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search"]
     for domain in bad_domains:
-        if domain in url.lower(): return True
+        if domain in url_lower: 
+            return True
+            
+    # 👈 فلترة العناوين المضروبة (إفصاحات البورصة الخام اللي بتيجي من مباشر)
+    if title:
+        bad_title_patterns = ["كود الترقيم", "الشركةاسم", "نموذج تقرير إفصاح", "EFG HOLDING", "إفصاح مكمل"]
+        for pattern in bad_title_patterns:
+            if pattern in title:
+                print(f"      🚫 Skipped: Raw Exchange Disclosure (Bad Title)")
+                return True
+                
     return False
-
 def build_smart_query(company_name, symbol):
     clean_name = company_name.replace("المصرية", "").replace("القابضة", "").strip()
     # إضافة when:5d بتجبر جوجل يجيب أحدث الأخبار في آخر 5 أيام وبيتجاهل القديم تماماً
@@ -323,6 +338,522 @@ def save_news_to_db(stock_id, symbol, title, description, content, url, source, 
     except Exception as e:
         print(f"      ❌ DB Error: {e}")
 
+
+
+def scrape_vetogate(soup):
+    """استخراج النص الصافي من موقع فيتو"""
+    # المحتوى الفعلي لخبر "فيتو" موجود دايماً جوه div الكلاس بتاعه paragraph-list
+    content_div = soup.find('div', class_='paragraph-list')
+    
+    if not content_div:
+        return None # بنرجع None عشان الروتر يفهم إنه فشل ويشغل الطريقة القديمة
+        
+    # تنظيف أي صور أو سكربتات جوه النص نفسه
+    for tag in content_div.find_all(['figure', 'script', 'style']):
+        tag.decompose()
+        
+    # استخراج النص مع وضع مسافات بين الفقرات
+    text = content_div.get_text(separator="\n\n").strip()
+    
+    # تنظيف المسافات الفاضية الزيادة
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    
+    return text
+
+
+
+
+def scrape_almasryalyoum(soup):
+    """استخراج النص الصافي من موقع المصري اليوم"""
+    # المصري اليوم غالباً بيحط الخبر جوه div الكلاس بتاعه article-body أو id اسمه NewsStory
+    content_div = soup.find('div', id='NewsStory') or soup.find('div', class_='article-body')
+    
+    # لو ملقناش الحاوية دي لأي سبب، هنشتغل على الـ HTML كله
+    if not content_div:
+        content_div = soup
+
+    # 1. تنظيف الفخاخ (الإعلانات والأخبار الجانبية)
+    junk_classes = ['related-article-inside-body', 'article-body-ad', 'no-print']
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=junk):
+            tag.decompose()
+
+    # تنظيف أي أكواد Style أو Script جوا النص
+    for tag in content_div.find_all(['script', 'style']):
+        tag.decompose()
+
+    # 2. تنظيف لينكات "اقرأ أيضاً" اللي بتبقى في آخر الخبر
+    # الفكرة: لو البراجراف <p> مفيش جواه غير لينك <a> ونفس النص، يبقى ده ترويج ونمسحه
+    for p_tag in content_div.find_all('p'):
+        a_tag = p_tag.find('a')
+        if a_tag:
+            # بنقارن نص البراجراف بنص اللينك، لو متطابقين يبقى ده مجرد لينك ترويجي
+            if p_tag.get_text(strip=True) == a_tag.get_text(strip=True):
+                p_tag.decompose()
+
+    # 3. استخراج النص الصافي (هنسحب العناوين والبراجرافات بس عشان نتجنب أي داتا عشوائية)
+    text_parts = []
+    for tag in content_div.find_all(['p', 'h1', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        # هنتجاهل الكلمات الصريحة اللي بتفضل زي "قد يهمك"
+        if text and text != "قد يهمك":
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # فلترة أخيرة للمسافات الزيادة
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+def scrape_fintechgate(soup):
+    """استخراج النص الصافي من موقع فنتيك جيت"""
+    # الحاوية الرئيسية للخبر في فنتيك جيت
+    content_div = soup.find('div', id='penci-post-entry-inner') or soup.find('div', class_='inner-post-entry')
+    
+    if not content_div:
+        return None
+
+    # 1. تنظيف الفخاخ (الإعلانات، الروابط المختصرة، الكلمات الدالة، بوكس قد يعجبك)
+    junk_classes = [
+        'code-block', 'penci-custom-html-inside-content', 
+        'penci-ilrltpost-beaf', 'shorten_url', 'post-tags', 
+        'penci-single-link-pages'
+    ]
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=junk):
+            tag.decompose()
+
+    # تنظيف أي أكواد ستايل أو سكربتات
+    for tag in content_div.find_all(['style', 'script']):
+        tag.decompose()
+
+    # 2. تنظيف جزء "روابط ذات صلة:" واللينكات اللي تحتها
+    for h4 in content_div.find_all(['h4', 'h3', 'p']):
+        if 'روابط ذات صلة' in h4.get_text():
+            # بندور على القائمة اللي بعد الكلمة دي ونمسحها
+            next_node = h4.find_next_sibling()
+            if next_node and next_node.name == 'ul':
+                next_node.decompose()
+            h4.decompose() # نمسح العنوان نفسه
+
+    # 3. تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين بس
+    for tag in content_div.find_all(['p', 'h1', 'h2', 'h3', 'h4']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+def scrape_masrawy(soup):
+    """استخراج النص الصافي من موقع مصراوي"""
+    # الحاوية الأساسية للخبر في مصراوي
+    content_div = soup.find('div', class_='ArticleDetails details')
+    
+    if not content_div:
+        return None
+
+    # 1. مسح بوكس "أخبار ذات صلة" المدمج في وسط الخبر
+    for tag in content_div.find_all('section', class_='pattern01'):
+        tag.decompose()
+
+    # 2. تجميع النص وتجاهل أي لينكات ترويجية أو "اقرأ أيضا"
+    text_parts = []
+    for tag in content_div.find_all(['p', 'h1', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        
+        # تجاهل كلمة "اقرأ أيضًا" أو "اقرأ أيضا"
+        if "اقرأ أيضًا" in text or "اقرأ أيضا" in text:
+            continue
+            
+        # لو البراجراف عبارة عن لينك بس (زي اللي بييجوا بعد اقرأ أيضا)، نتجاهله
+        a_tag = tag.find('a')
+        if a_tag and tag.get_text(strip=True) == a_tag.get_text(strip=True):
+            continue
+            
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+def scrape_masrtimes(soup):
+    """استخراج النص الصافي من موقع مصر تايمز"""
+    # الحاوية الأساسية للخبر
+    content_div = soup.find('div', class_='paragraph-list')
+    
+    if not content_div:
+        return None
+
+    # مسح الصور والتعليقات اللي تحتها (اللي بتكرر العنوان) وأي إعلانات
+    for tag in content_div.find_all(['figure', 'img', 'figcaption', 'script', 'style']):
+        tag.decompose()
+        
+    # تجميع النص (براجرافات، عناوين فرعية، وعناصر القوائم زي الأسهم)
+    text_parts = []
+    for tag in content_div.find_all(['p', 'h2', 'h3', 'li']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+            
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+def scrape_mubasher(soup):
+    """استخراج النص الصافي من موقع مباشر (Mubasher)"""
+    # الحاوية الأساسية للخبر
+    content_div = soup.find('div', itemprop='articleBody') or soup.find('div', class_='article__content-text')
+    
+    if not content_div:
+        return None
+
+    # 1. تنظيف الفخاخ (ويدجت الأسهم، الإعلانات، وأي أكواد برمجية)
+    junk_classes = ['mi-article__stocks', 'outstream-ad-container', 'stock-price-block']
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=junk):
+            tag.decompose()
+
+    for tag in content_div.find_all(['script', 'style', 'iframe']):
+        tag.decompose()
+
+    # 2. تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين الفرعية بس
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+def scrape_amwalalghad(soup):
+    """استخراج النص الصافي من موقع أموال الغد"""
+    # الحاوية الأساسية للخبر
+    content_div = soup.find('div', id='penci-post-entry-inner') or soup.find('div', class_='inner-post-entry')
+    
+    if not content_div:
+        return None
+
+    # 1. تنظيف الفخاخ (الإعلانات، الأخبار المتعلقة، الروابط المختصرة، أكواد التتبع)
+    junk_classes = [
+        'penci-ilrltpost-insert', 'shorten_url', 'post-tags', 
+        'penci-single-link-pages', 'penci-post-countview-number-check',
+        'penci-google-adsense-1'
+    ]
+    for junk in junk_classes:
+        for tag in content_div.find_all(['div', 'i'], class_=junk):
+            tag.decompose()
+
+    # تنظيف أي ستايل أو سكريبتات
+    for tag in content_div.find_all(['style', 'script']):
+        tag.decompose()
+
+    # 2. تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين الفرعية
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+def scrape_arabfinance(soup):
+    """استخراج النص الصافي من موقع آراب فاينانس"""
+    # هنشتغل على الـ HTML كله وننظف منه الأجزاء اللي مش عايزينها
+    content_div = soup
+
+    # 1. تنظيف الفخاخ (الإعلانات، العلامات، والأخبار المشابهة)
+    junk_classes = ['details-tags', 'video-section-title', 'news-single-category']
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=re.compile(junk)):
+            tag.decompose()
+
+    # مسح إعلانات جوجل الصريحة
+    for tag in content_div.find_all('div', id=re.compile(r'^div-gpt-ad')):
+        tag.decompose()
+
+    # تنظيف أي أكواد ستايل أو سكربتات
+    for tag in content_div.find_all(['style', 'script']):
+        tag.decompose()
+
+    # 2. تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين الفرعية
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+def scrape_petronews(soup):
+    """استخراج النص الصافي من موقع بترو نيوز"""
+    # الحاوية الرئيسية للخبر في قالب Jannah
+    content_div = soup.find('div', class_='entry-content entry')
+    
+    if not content_div:
+        return None
+
+    # 1. تنظيف الفخاخ (أيقونات المشاركة، عداد المشاهدات، الروابط المختصرة، والأخبار المتعلقة)
+    junk_classes = [
+        'post-views', 'post-shortlink', 'share-buttons',
+        'about-author', 'post-components', 'related-posts'
+    ]
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=re.compile(junk)):
+            tag.decompose()
+
+    # مسح أي صور (figure) أو سكربتات
+    for tag in content_div.find_all(['figure', 'img', 'script', 'style']):
+        tag.decompose()
+
+    # 2. تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين الفرعية
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        # تجاهل البراجرافات اللي بتبدأ بـ "مصدر الخبر:"
+        if text and not text.startswith("مصدر الخبر:"):
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+def scrape_msn(soup):
+    """استخراج النص الصافي من موقع MSN"""
+    # MSN بيحط المحتوى جوه كلاسات زي article-content أو tags مخصصة زي cp-article
+    content_div = soup.find('div', class_='article-content') or soup.find('cp-article') or soup
+    
+    if not content_div:
+        return None
+
+    # تنظيف الإعلانات والوصف المتكرر للصور
+    for tag in content_div.find_all(['display-ads', 'figcaption', 'script', 'style']):
+        tag.decompose()
+        
+    text_parts = []
+    seen = set() # 👈 بنعمل Set عشان نخزن فيها الجمل ونمنع تكرارها
+    
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        # لو النص موجود ومش متكرر قبل كده في الـ Set، ضيفه
+        if text and text not in seen:
+            seen.add(text)
+            text_parts.append(text)
+            
+    final_text = "\n\n".join(text_parts)
+    return final_text if len(final_text) > 100 else None
+
+def scrape_youm7(soup):
+    """استخراج النص الصافي من موقع اليوم السابع"""
+    # الحاوية الرئيسية للخبر في اليوم السابع
+    content_div = soup.find('div', id='articleBody') or soup.find('div', class_='articleCont')
+    
+    if not content_div:
+        return None
+
+    # 1. تنظيف الفخاخ (إعلانات، أيقونات واتساب وجوجل نيوز، اسم الكاتب)
+    for tag in content_div.find_all(['script', 'style', 'img', 'figure']):
+        tag.decompose()
+
+    # مسح الروابط الترويجية (جوجل نيوز وواتساب)
+    for a_tag in content_div.find_all('a'):
+        link_text = a_tag.get_text(strip=True)
+        if "Google News" in link_text or "واتساب" in link_text:
+            a_tag.decompose()
+
+    # مسح إعلانات تابولا وجوجل
+    for tag in content_div.find_all('div', id=re.compile(r'taboola|div-gpt-ad')):
+        tag.decompose()
+
+    # مسح اسم الكاتب لو موجود
+    for tag in content_div.find_all('span', class_='writeBy'):
+        tag.decompose()
+
+    # 2. تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين الفرعية
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+
+def scrape_alboslanews(soup):
+    """استخراج النص الصافي من موقع البوصلة نيوز"""
+    # الحاوية المخصصة للنص فقط في موقع البوصلة
+    content_div = soup.find('div', class_='news-content')
+    
+    if not content_div:
+        return None
+
+    # تنظيف أي صور أو سكريبتات مستخبية جوه النص
+    for tag in content_div.find_all(['script', 'style', 'img']):
+        tag.decompose()
+
+    # هنا مش محتاجين نفلتر كتير لأن الحاوية نظيفة بطبيعتها
+    final_text = content_div.get_text(separator="\n\n").strip()
+    
+    # تنظيف المسافات والسطور الفاضية الزيادة
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+
+def scrape_almalnews(soup):
+    """استخراج النص الصافي من جريدة المال"""
+    # الحاوية الرئيسية للخبر في جريدة المال
+    content_div = soup.find('div', class_='article-content')
+    
+    if not content_div:
+        return None
+
+    # تنظيف الإعلانات الجانبية المخفية جوه النص وأي سكربتات أو صور
+    junk_classes = ['news-side-column']
+    for junk in junk_classes:
+        for tag in content_div.find_all('div', class_=junk):
+            tag.decompose()
+
+    for tag in content_div.find_all(['script', 'style', 'img', 'figure', 'iframe']):
+        tag.decompose()
+
+    # تجميع النص الصافي
+    text_parts = []
+    # هنسحب البراجرافات والعناوين الفرعية
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    
+    # تنظيف المسافات الفاضية
+    final_text = re.sub(r'\n\s*\n', '\n\n', final_text)
+    
+    return final_text if len(final_text) > 100 else None
+
+
+
+# قاموس بيربط الدومين بالدالة بتاعته
+SCRAPERS = {
+    "vetogate.com": scrape_vetogate,
+    "almasryalyoum.com": scrape_almasryalyoum, # 👈 ضفنا المصري اليوم هنا
+    # هنضيف باقي المواقع هنا تباعاً
+    "fintechgate.net": scrape_fintechgate, # 👈 ضفنا فنتيك جيت هنا
+    "masrawy.com": scrape_masrawy, # 👈 ضفنا مصراوي هنا
+    "masrtimes.com": scrape_masrtimes, # 👈 ضفنا مصر تايمز هنا عشان يمنع التكرار
+    "mubasher.info": scrape_mubasher, # 👈 ضفنا موقع مباشر هنا
+    "amwalalghad.com": scrape_amwalalghad, # 👈 ضفنا أموال الغد هنا
+    "arabfinance.com": scrape_arabfinance, # 👈 ضفنا آراب فاينانس هنا
+    "petro-news.com": scrape_petronews, # 👈 ضفنا بترو نيوز هنا
+    "youm7.com": scrape_youm7, # 👈 ضفنا اليوم السابع هنا
+    "msn.com": scrape_msn, # 👈 ضفنا MSN هنا
+    "alboslanews.com": scrape_alboslanews, # 👈 ضفنا البوصلة نيوز هنا
+    "almalnews.com": scrape_almalnews, # 👈 ضفنا جريدة المال هنا
+}
+
+def extract_smart_content(url, html_content):
+    """
+    مُوجّه ذكي: بيفحص الرابط وبيشغل الدالة المخصصة لو موجودة،
+    أو بيرجع يشتغل بالطريقة العامة المحدثة المانعة للتكرار.
+    """
+
+    if "arabfinance.com" in url.lower() and "companyprofile" in url.lower():
+        print(f"      🚫 Skipped: Arab Finance Company Profile (Not a news article)")
+        return None
+    
+    soup = BeautifulSoup(html_content, "html.parser")
+    
+    # 1. البحث عن طريقة مخصصة للموقع
+    for domain, scraper_func in SCRAPERS.items():
+        if domain in url:
+            extracted_text = scraper_func(soup)
+            if extracted_text and len(extracted_text) > 100:
+                print(f"      🎯 Custom Scraper Used for: {domain}")
+                return extracted_text
+                
+    # 2. الطريقة القديمة (Fallback) المحدثة (Anti-Duplication)
+    print(f"      🔄 Using General Fallback Scraper (Anti-Duplication)...")
+    
+    # 🧹 أ. إزالة العناصر الهيكلية اللي بتجيب تكرار (عناوين الـ Meta، وصف الصور، الهيدر، الفوتر)
+    for tag in soup.find_all(['header', 'footer', 'nav', 'aside', 'figcaption', 'title', 'meta', 'script', 'style']):
+        tag.decompose()
+        
+    # 🧹 ب. إزالة الكلاسات المزعجة (إعلانات، أخبار متعلقة، مشاركة)
+    junk_classes = re.compile(r'(related|widget|more|ad|social|share|tags|comments)', re.IGNORECASE)
+    for tag in soup.find_all(class_=junk_classes):
+        tag.decompose()
+        
+    # 🧠 ج. سحب النص بذكاء لمنع التكرار نهائياً
+    text_parts = []
+    seen_paragraphs = set() # ذاكرة السكريبت عشان ميحطش حاجة مرتين
+    
+    # هنسحب البراجرافات والعناوين بس (مش هنسحب الصفحة كلها عمياني)
+    for tag in soup.find_all(['p', 'h1', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        
+        # لو النص مش فاضي، ومقرأناهوش قبل كده، ضيفه
+        if text and text not in seen_paragraphs:
+            seen_paragraphs.add(text)
+            text_parts.append(text)
+            
+    final_text = "\n\n".join(text_parts)
+    return final_text
+
+
+
+
+
 # ==============================================================================
 # 5. Scraper Engines
 # ==============================================================================
@@ -375,7 +906,7 @@ def process_stocks(stocks_list):
                     print(f"      ⏩ Skipped: Too old ({pub_date})")
                     continue
 
-                if is_blacklisted(entry.link):
+                if is_blacklisted(entry.link, title):
                     print(f"      ⏩ Skipped: Blacklisted domain")
                     continue
 
@@ -399,10 +930,11 @@ def process_stocks(stocks_list):
                     print(f"      ⚠️ Trafilatura Error: {e}")
 
                 if not content or len(content) < 400:
-                    print(f"      🔄 Falling back to BS4/Selenium source...")
                     try:
-                        content = BeautifulSoup(driver.page_source, "html.parser").get_text(separator="\n").strip()
-                    except: pass
+                        # هنبعت اللينك وكود الصفحة للروتر الذكي بتاعنا
+                        content = extract_smart_content(final_url, driver.page_source)
+                    except Exception as e: 
+                        print(f"      ⚠️ Smart Extraction Error: {e}")
 
                 save_news_to_db(stock_id, symbol, title, rss_desc, content, final_url, "Google News", pub_date)
             
@@ -440,7 +972,7 @@ def process_crypto(crypto_list):
                     print(f"      ⏩ Skipped: Too old ({pub_date})")
                     continue
 
-                if is_blacklisted(entry.link):
+                if is_blacklisted(entry.link, title):
                     print(f"      ⏩ Skipped: Blacklisted domain")
                     continue
 
@@ -462,8 +994,10 @@ def process_crypto(crypto_list):
 
                 if not content or len(content) < 400:
                     try:
-                        content = BeautifulSoup(driver.page_source, "html.parser").get_text(separator="\n").strip()
-                    except: pass
+                        # استدعاء الروتر الذكي حتى للأخبار الإنجليزية
+                        content = extract_smart_content(final_url, driver.page_source)
+                    except Exception as e: 
+                        print(f"      ⚠️ Smart Extraction Error (Crypto): {e}")
 
                 # الحفظ وتوجيه الذكاء الاصطناعي (FinBERT هيشتغل أوتوماتيك لأن الخبر إنجليزي)
                 save_news_to_db(coin_id, symbol, title, rss_desc, content, final_url, "Google News Crypto", pub_date)
@@ -481,10 +1015,10 @@ if __name__ == "__main__":
         all_stocks = supabase.table("stocks").select("*").execute().data
         print(f"✅ Loaded {len(all_stocks)} items from DB")
 
-        crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
+        # crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
         stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
 
-        if crypto: process_crypto(crypto)
+        # if crypto: process_crypto(crypto)
         if stocks: process_stocks(stocks)
 
     except Exception as e: 
