@@ -227,7 +227,13 @@ def is_blacklisted(url, title=""):
                 print(f"      🚫 Skipped: Raw Exchange Disclosure (Bad Title)")
                 return True
                 
+    if "consent.google.com" in url: return True
+    # إضافة المواقع الإعلانية المشهورة في الكريبتو
+    crypto_junk = ["sponsored", "press-release", "advertise"]
+    if any(junk in url.lower() for junk in crypto_junk): return True
     return False
+
+
 def build_smart_query(company_name, symbol):
     clean_name = company_name.replace("المصرية", "").replace("القابضة", "").strip()
     # إضافة when:5d بتجبر جوجل يجيب أحدث الأخبار في آخر 5 أيام وبيتجاهل القديم تماماً
@@ -906,24 +912,104 @@ def scrape_alborsaanews(soup):
 
 
 
+def scrape_coingape(soup):
+    """استخراج النص الصافي من موقع CoinGape"""
+    # الحاوية الرئيسية في كوين جيب
+    content_div = soup.find('div', class_='c-content') or soup.find('div', class_='main')
+    
+    if not content_div:
+        return None
+
+    # 🛡️ تنظيف الإعلانات المزعجة في نص الخبر
+    junk_selectors = [
+        'div.ads-container', 'div.highlight-ad-section', 'section#faq',
+        'div.keyfeatures', 'div.googlenewsbtn-contreloer'
+    ]
+    for selector in junk_selectors:
+        for tag in content_div.select(selector):
+            tag.decompose()
+
+    for tag in content_div.find_all(['script', 'style', 'img', 'figure', 'button']):
+        tag.decompose()
+
+    # تجميع النص
+    text_parts = []
+    for tag in content_div.find_all(['p', 'h2', 'h3']):
+        text = tag.get_text(separator=" ").strip()
+        # تجاهل جمل إخلاء المسؤولية (Disclaimer)
+        if "Investment disclaimer" in text or "Ad Disclosure" in text:
+            continue
+        if text:
+            text_parts.append(text)
+
+    final_text = "\n\n".join(text_parts)
+    return final_text if len(final_text) > 200 else None
+
+def scrape_coindesk(soup):
+    """تنظيف موقع CoinDesk"""
+    content_div = soup.find('div', class_='common-stylestext-wrapper') or soup.find('article')
+    if content_div:
+        # مسح سكشن "More from Coindesk" والاشتراكات
+        for tag in content_div.find_all(['aside', 'script', 'style']): tag.decompose()
+        return content_div.get_text(separator="\n\n").strip()
+    return None
+
+def scrape_cointelegraph(soup):
+    """تنظيف موقع CoinTelegraph"""
+    content_div = soup.find('div', class_='post-content')
+    if content_div:
+        # مسح سكشن "Read more" وإعلانات وسط المقال
+        for tag in content_div.find_all(['div', 'script', 'style'], class_=re.compile(r'related|ad|promo')):
+            tag.decompose()
+        return content_div.get_text(separator="\n\n").strip()
+    return None
+
+def scrape_decrypt(soup):
+    """تنظيف موقع Decrypt"""
+    content_div = soup.find('div', class_='post-content') or soup.find('article')
+    if content_div:
+        return content_div.get_text(separator="\n\n").strip()
+    return None
+
+def scrape_cryptoslate(soup):
+    """تنظيف موقع CryptoSlate"""
+    content_div = soup.find('article', class_='post-column')
+    if content_div:
+        return content_div.get_text(separator="\n\n").strip()
+    return None
+
+
+CRYPTO_FEEDS = [
+    "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "https://cointelegraph.com/rss",
+    "https://decrypt.co/feed",
+    "https://coingape.com/feed/",
+    "https://cryptoslate.com/feed/"
+]
+
 # قاموس بيربط الدومين بالدالة بتاعته
 SCRAPERS = {
     "vetogate.com": scrape_vetogate,
-    "almasryalyoum.com": scrape_almasryalyoum, # 👈 ضفنا المصري اليوم هنا
-    # هنضيف باقي المواقع هنا تباعاً
-    "fintechgate.net": scrape_fintechgate, # 👈 ضفنا فنتيك جيت هنا
-    "masrawy.com": scrape_masrawy, # 👈 ضفنا مصراوي هنا
-    "masrtimes.com": scrape_masrtimes, # 👈 ضفنا مصر تايمز هنا عشان يمنع التكرار
-    "mubasher.info": scrape_mubasher, # 👈 ضفنا موقع مباشر هنا
-    "amwalalghad.com": scrape_amwalalghad, # 👈 ضفنا أموال الغد هنا
-    "arabfinance.com": scrape_arabfinance, # 👈 ضفنا آراب فاينانس هنا
-    "petro-news.com": scrape_petronews, # 👈 ضفنا بترو نيوز هنا
-    "youm7.com": scrape_youm7, # 👈 ضفنا اليوم السابع هنا
-    "msn.com": scrape_msn, # 👈 ضفنا MSN هنا
-    "alboslanews.com": scrape_alboslanews, # 👈 ضفنا البوصلة نيوز هنا
-    "almalnews.com": scrape_almalnews, # 👈 ضفنا جريدة المال هنا
-    "ahram.org.eg": scrape_ahram, # 👈 ضفنا بوابة الأهرام هنا
-    "dostor.org": scrape_dostor, # 👈 ضفنا جريدة الدستور هنا
+    "almasryalyoum.com": scrape_almasryalyoum,
+    "fintechgate.net": scrape_fintechgate,
+    "masrawy.com": scrape_masrawy,
+    "masrtimes.com": scrape_masrtimes,
+    "mubasher.info": scrape_mubasher,
+    "amwalalghad.com": scrape_amwalalghad,
+    "arabfinance.com": scrape_arabfinance,
+    "petro-news.com": scrape_petronews,
+    "youm7.com": scrape_youm7,
+    "msn.com": scrape_msn,
+    "alboslanews.com": scrape_alboslanews,
+    "almalnews.com": scrape_almalnews,
+    "ahram.org.eg": scrape_ahram,
+    "dostor.org": scrape_dostor,
+    "alborsaanews.com": scrape_alborsaanews,
+    "coingape.com": scrape_coingape,
+    "coindesk.com": scrape_coindesk,
+    "cointelegraph.com": scrape_cointelegraph,
+    "decrypt.co": scrape_decrypt,
+    "cryptoslate.com": scrape_cryptoslate
 }
 
 
@@ -933,26 +1019,27 @@ SCRAPERS["alborsaanews.com"] = scrape_alborsaanews
 def extract_smart_content(url, html_content):
     """
     الموجه الذكي: النسخة النهائية المانعة للاشتراكات، الـ Login، والتكرار العشوائي.
-    تستخدم لتنظيف الخبر قبل إرساله للذكاء الاصطناعي.
+    تستخدم لتنظيف الخبر قبل إرساله للذكاء الاصطناعي (Arabic/English).
     """
     url_lower = url.lower()
 
-    # 🛡️ 1. فلتر الحماية من صفحات البروفايل (تجنباً لجداول البيانات الصماء)
+    # 🛡️ 1. فلتر الحماية من صفحات البروفايل (Arab Finance تحديداً)
     if "arabfinance.com" in url_lower and "companyprofile" in url_lower:
-        print(f"      🚫 Skipped: Arab Finance Company Profile (Not a news article)")
+        print(f"      🚫 Skipped: Arab Finance Data Page")
         return None
     
     soup = BeautifulSoup(html_content, "html.parser")
     
     # 🛡️ 2. فلتر النوع (Article vs Website)
-    # نرفض الصفحات التي تُعرف نفسها كـ Website عطلة إلا لو كان اللينك يحمل دلالة إخبارية
+    # المواقع العالمية بتعرف نفسها كـ article لو الصفحة فيها خبر حقيقي
     og_type = soup.find("meta", property="og:type")
     if og_type and og_type.get("content") == "website":
+        # لو الصفحة "Website" ومش شايلة أي علامة تدل إنها خبر (زي كلمة story أو news)، ارفضها
         if not any(word in url_lower for word in ['story', 'news', 'details', '2026', 'amp', 'article']):
-            print(f"      🚫 Skipped: Page type is 'website', not an article")
+            print(f"      🚫 Skipped: Generic website page (Not an article)")
             return None
 
-    # 3️⃣ البحث عن طريقة سحب مخصصة (Custom Scrapers)
+    # 3️⃣ البحث عن طريقة سحب مخصصة (Custom Scrapers) لضمان أعلى دقة
     for domain, scraper_func in SCRAPERS.items():
         if domain in url:
             extracted_text = scraper_func(soup)
@@ -960,19 +1047,17 @@ def extract_smart_content(url, html_content):
                 print(f"      🎯 Custom Scraper Used: {domain}")
                 return extracted_text
             else:
-                # لو الدالة المخصصة رجعت None (يعني اكتشفت إنها صفحة بيانات أو مقفولة)، نرفض الخبر
-                print(f"      ⚠️ Custom Scraper returned None for: {domain}")
                 return None
                 
-    # 4️⃣ الـ Fallback العام المطور (للمواقع غير المسجلة في القاموس)
-    print(f"      🔄 Using General Fallback Scraper (Multi-Filter)...")
+    # 4️⃣ الـ Fallback العام (لو الموقع غريب أو مش متسجل عندنا)
+    print(f"      🔄 Using General Fallback Scraper (Strict Cleaning)...")
     
-    # أ. حذف العناصر الهيكلية التي تسبب تكرار العناوين (مثل الـ Title والـ Figcaption)
+    # أ. حذف العناصر الهيكلية (عشان العنوان ميتكررش مرتين)
     tags_to_kill = ['header', 'footer', 'nav', 'aside', 'figcaption', 'title', 'meta', 'script', 'style', 'button']
     for tag in soup.find_all(tags_to_kill):
         tag.decompose()
         
-    # ب. حذف كلاسات الإعلانات، الـ Login، والاشتراكات (Paywalls) بناءً على الكلمات المفتاحية
+    # ب. حذف كلاسات الإعلانات + الـ Login + الاشتراكات (Paywalls) - حل مشكلة صور "جريدة المال"
     junk_regex = re.compile(r'(related|widget|ad|social|share|tags|comments|login|auth|popup|modal|form|paywall|subscription|subscribe|register)', re.IGNORECASE)
     for tag in soup.find_all(class_=junk_regex):
         tag.decompose()
@@ -980,35 +1065,33 @@ def extract_smart_content(url, html_content):
     text_parts = []
     seen_paragraphs = set() 
     
-    # ج. قائمة الكلمات المحظورة التي لو ظهرت في سطر يتم إلغاؤه فوراً (مخلفات الـ Login والاشتراك)
+    # ج. قائمة الكلمات المحظورة (عشان صورة السويدي والبورصة اللي كان فيها جمل Login)
     forbidden_lines = [
         'login', 'password', 'sign in', 'username', 'reset your password', 
         'اشترك الآن', 'سجل الدخول', 'محتوى للمشتركين', 'النسخة الرقمية',
-        'visibility - public', 'enter your username', 'create an account'
+        'visibility - public', 'enter your username'
     ]
     
-    # د. استخراج النص من البراجرافات والعناوين فقط
+    # د. استخراج النص بذكاء
     for tag in soup.find_all(['p', 'h1', 'h2', 'h3']):
         text = tag.get_text(separator=" ").strip()
         
-        # فلتر الكلمات المحظورة
+        # لو السطر فيه أي كلمة من المحظورات، تجاهله
         if any(word in text.lower() for word in forbidden_lines):
             continue
             
         if text:
-            # 🧠 منطق منع التكرار الذكي:
-            # - الجمل الطويلة (> 35 حرف): لو اتكررت نمسحها (زي تكرار العناوين).
-            # - الجمل القصيرة (< 35 حرف): نسمح بتكرارها عادي (زي أسعار الشراء والبيع في أخبار البنوك).
+            # 🧠 منطق منع التكرار:
+            # لو الجملة مكررة وطويلة (> 35 حرف) امسحها.
+            # لو قصيرة (< 35 حرف) سيبها عشان أسعار الشراء والبيع في أخبار العملات.
             if text not in seen_paragraphs or len(text) < 35:
                 seen_paragraphs.add(text)
                 text_parts.append(text)
                 
     final_text = "\n\n".join(text_parts)
     
-    # هـ. فحص نهائي: لو النص قصير جداً بعد التنظيف، غالباً هو ليس خبراً حقيقياً
+    # هـ. فحص الجودة: لو النص طلع "قشرة" (أقل من 150 حرف) يبقى مش خبر حقيقي
     return final_text if len(final_text) > 150 else None
-
-
 # ==============================================================================
 # 5. Scraper Engines
 # ==============================================================================
@@ -1098,70 +1181,54 @@ def process_stocks(stocks_list):
         print("\n🛑 Closing Chrome Driver...")
         driver.quit()
 
+
+
+
 def process_crypto(crypto_list):
-    driver = setup_stock_driver() # هنستخدم نفس متصفح الأسهم عشان نجيب الداتا من جوجل
+    print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Fixed Sources (Speed Mode)\n{'='*50}")
+    
+    # خريطة العملات لسرعة المطابقة
+    coin_map = {coin['symbol'].lower(): coin['id'] for coin in crypto_list}
+    # إضافة الأسماء الكاملة للمطابقة (بشرط تكون كلمة واحدة زي bitcoin)
+    for coin in crypto_list:
+        name_key = coin['company_name_en'].lower().replace(" ", "")
+        coin_map[name_key] = coin['id']
+
+    driver = setup_stock_driver()
+    processed_urls = set()
+
     try:
-        print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Processing {len(crypto_list)} coins\n{'='*50}")
-        for coin in crypto_list:
-            symbol, name_en, coin_id = coin['symbol'], coin['company_name_en'], coin['id']
+        for feed_url in CRYPTO_FEEDS:
+            print(f"📡 Scanning Feed: {feed_url.split('/')[2]}...")
+            feed = feedparser.parse(feed_url)
             
-            # بنعمل طلب بحث مخصص لكل عملة لوحدها على Google News بالإنجليزي
-            query = f'("{name_en}" OR "{symbol} crypto" OR "{symbol} coin") when:5d'
-            encoded_query = quote(query)
-            rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
-
-            print(f"\n📡 [{symbol}] Scanning Google News (Crypto)...")
-            feed = feedparser.parse(rss_url)
-            
-            # هناخد آخر 2 أخبار لكل عملة عشان منستهلكش وقت طويل
-            entries = feed.entries[:5]
-            print(f"   Found {len(feed.entries)} entries, taking top {len(entries)}")
-
-            for entry in entries:
+            for entry in feed.entries[:10]: # أحدث 10 أخبار من كل سورس
                 title = entry.title
-                print(f"\n   💎 Title: {title[:60]}...")
+                if entry.link in processed_urls: continue
+
+                # 🧠 المطابقة الذكية بالـ Symbol أو الاسم
+                matched_id = None
+                matched_symbol = None
+                search_box = (title + " " + entry.get('description', '')).lower()
                 
-                # زودنا المدة لـ 4 أيام عشان الكريبتو أخباره متقلبة
-                fresh, pub_date = is_fresh_news(entry, max_days=4)
-                if not fresh:
-                    print(f"      ⏩ Skipped: Too old ({pub_date})")
-                    continue
+                for key, c_id in coin_map.items():
+                    if f" {key} " in f" {search_box} ":
+                        matched_id = c_id
+                        matched_symbol = key.upper()
+                        break
+                
+                if matched_id:
+                    print(f"      ✅ Match Found [{matched_symbol}]: {title[:50]}...")
+                    final_url = resolve_url_with_selenium(entry.link, driver)
+                    
+                    # الروتر هنا هيعرف يختار المنظف الصح أوتوماتيك
+                    content = extract_smart_content(final_url, driver.page_source)
 
-                if is_blacklisted(entry.link, title):
-                    print(f"      ⏩ Skipped: Blacklisted domain")
-                    continue
-
-                if is_duplicate_news(coin_id, title):
-                    print(f"      🚫 Skipped: Duplicate title detected in DB")
-                    continue
-
-                print(f"      🚀 Resolving URL with Selenium...")
-                final_url = resolve_url_with_selenium(entry.link, driver)
-
-                content = None
-                rss_desc = clean_html(entry.description) if 'description' in entry else ""
-
-                try:
-                    downloaded = trafilatura.fetch_url(final_url)
-                    if downloaded:
-                        content = trafilatura.extract(downloaded, include_formatting=True, include_links=False)
-                except Exception: pass
-
-                if not content or len(content) < 400:
-                    try:
-                        # استدعاء الروتر الذكي حتى للأخبار الإنجليزية
-                        content = extract_smart_content(final_url, driver.page_source)
-                    except Exception as e: 
-                        print(f"      ⚠️ Smart Extraction Error (Crypto): {e}")
-
-                # الحفظ وتوجيه الذكاء الاصطناعي (FinBERT هيشتغل أوتوماتيك لأن الخبر إنجليزي)
-                save_news_to_db(coin_id, symbol, title, rss_desc, content, final_url, "Google News Crypto", pub_date)
-            
-            time.sleep(random.uniform(1, 3))
+                    if content:
+                        save_news_to_db(matched_id, matched_symbol, title, "", content, final_url, "Crypto Intelligence", datetime.now(timezone.utc))
+                        processed_urls.add(entry.link)
     finally:
-        print("\n🛑 Closing Chrome Driver (Crypto)...")
         driver.quit()
-
 if __name__ == "__main__":
     start_time = datetime.now()
     print(f"🚀 Job Started: {start_time}")
@@ -1170,11 +1237,11 @@ if __name__ == "__main__":
         all_stocks = supabase.table("stocks").select("*").execute().data
         print(f"✅ Loaded {len(all_stocks)} items from DB")
 
-        # crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
-        stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
+        crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
+        # stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
 
-        # if crypto: process_crypto(crypto)
-        if stocks: process_stocks(stocks)
+        if crypto: process_crypto(crypto)
+        # if stocks: process_stocks(stocks)
 
     except Exception as e: 
         print(f"\n🚨 CRITICAL ERROR: {e}")
