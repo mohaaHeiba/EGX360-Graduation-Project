@@ -1,6 +1,7 @@
 import time
 import feedparser
 import trafilatura
+import requests
 import firebase_admin
 import re
 import random
@@ -213,7 +214,8 @@ def clean_and_validate_content(text, description, title):
 def is_blacklisted(url, title=""):
     url_lower = url.lower()
     
-    bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search","asharqbusiness.com","akher.news","fath-news.com"]
+    bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search",
+                   "asharqbusiness.com","akher.news","fath-news.com","belbalady.net","belbalady","asharqbusiness"]
     for domain in bad_domains:
         if domain in url_lower: 
             return True
@@ -300,72 +302,68 @@ def send_notification(symbol, news_title, news_url):
 # 4. Database Saving & AI Routing
 # ==============================================================================
 
-def save_news_to_db(stock_id, symbol, title, description, content, url, source, pub_date):
+def save_news_to_db(stock_id, symbol, title, description, content, url, source, pub_date, is_api=False, send_alert=False):
+    """
+    حفظ الأخبار في قاعدة البيانات مع معالجة ذكية للـ APIs والـ Scrapers والإشعارات.
+    """
     try:
-        # فحص إذا كان الرابط موجود مسبقاً
-        check = supabase.table("stock_news").select("id").eq("url", url).execute()
+        # 1. فحص التكرار (عن طريق الرابط)
+        check = supabase.table("stock_news").select("id").eq("url", url).eq("stock_id", stock_id).execute()
         if check.data: 
-            print(f"      ⏭️ Already exists (URL Match): {url[:40]}...")
-            return
+            return False 
 
-        # فحص تشابه العناوين
+        # 2. فحص العناوين المتشابهة
         if is_duplicate_news(stock_id, title):
-            print(f"      🚫 Skipped Duplicate Title: {title[:30]}...")
-            return
+            return False
 
-        final_description = clean_html(description)
-        if final_description.strip() == title.strip(): final_description = ""
-
-        # التنظيف الأولي للخبر
+        # 3. تنظيف المحتوى
         base_content = clean_and_validate_content(content, description, title)
-        
-        if not base_content or len(base_content) < 100:
-            print(f"      ⚠️ Content too thin ({len(base_content)} chars), trying description...")
-            base_content = final_description if len(final_description) > 50 else ""
 
-        if not base_content:
-            print(f"      ❌ Dropped: No usable content found.")
-            return 
+        if not is_api:
+            if not base_content or len(base_content) < 150:
+                print(f"      ⏩ Skipped: Content too short for Scraper ({len(base_content) if base_content else 0} chars)")
+                return False
+        else:
+            if not base_content or len(base_content) < 20:
+                base_content = title
 
-        # 🧠 توجيه الخبر للذكاء الاصطناعي (عربي / إنجليزي)
-        print(f"      🧠 AI Analysis Started...")
+        # 4. معالجة الذكاء الاصطناعي
         if is_arabic(title + base_content):
             is_valid, sentiment, final_content = process_arabic_with_cerebras(title, base_content)
-            
-            # لو الـ AI قال إن الخبر ملوش لازمة أو هراء، هنرميه فوراً
-            if not is_valid:
-                print(f"      🗑️ AI Dropped: Invalid or garbage Arabic content.")
-                return
-            print(f"      🤖 Cerebras (Arabic) -> Sentiment: {sentiment}")
+            if not is_valid: 
+                print(f"      🚫 AI: News marked as invalid/spam")
+                return False
         else:
-            # لو الخبر إنجليزي، نستخدم FinBERT للتصنيف والمحتوى المنظف مبدئياً
             sentiment = process_english_with_finbert(title, base_content)
             final_content = base_content 
-            print(f"      🤖 FinBERT (English) -> Sentiment: {sentiment}")
 
-        # حفظ البيانات في Supabase بشكل مفصول (المحتوى لوحده والتصنيف لوحده)
+        # 5. تجهيز البيانات للحفظ
+        formatted_date = pub_date.isoformat() if hasattr(pub_date, 'isoformat') else str(pub_date)
+
         data = {
-            "stock_id": stock_id, 
+            "stock_id": stock_id,
             "title": title, 
-            "description": final_description[:500],
-            "content": final_content, # المحتوى الكامل النظيف
+            "description": description[:500] if description else "", 
+            "content": final_content,
             "url": url, 
             "source": source,
-            "sentiment_label": sentiment, # التصنيف في العمود الجديد
-            "published_at": pub_date.isoformat()
+            "sentiment_label": sentiment, 
+            "published_at": formatted_date
         }
         
+        # تنفيذ الإدخال في Supabase
         supabase.table("stock_news").insert(data).execute()
-        print(f"      ✅ Successfully Saved! ({len(final_content)} chars) | Sentiment: {sentiment}")
         
-        # إرسال إشعار للمستخدمين (يمكن إيقافه لو مش محتاجه دلوقتي)
-        send_notification(symbol, title, url)
+        # 6. إرسال الإشعار (لو ده أول خبر للسهم/العملة في اللفة دي) 🔔
+        if send_alert:
+            send_notification(symbol, title, url)
+        
+        print(f"      ✅ DB: Saved [{sentiment}] news for [{symbol}] from {source}")
+        return True 
         
     except Exception as e:
-        print(f"      ❌ DB Error: {e}")
-
-
-
+        print(f"      ❌ DB Error for {symbol}: {e}")
+        return False
 def scrape_vetogate(soup):
     """استخراج النص الصافي من موقع فيتو"""
     # المحتوى الفعلي لخبر "فيتو" موجود دايماً جوه div الكلاس بتاعه paragraph-list
@@ -1134,6 +1132,10 @@ def process_stocks(stocks_list):
         print(f"\n{'='*50}\n🇪🇬 STOCK ENGINE: Processing {len(stocks_list)} items\n{'='*50}")
         for stock in stocks_list:
             symbol, name_ar, stock_id = stock['symbol'], stock['company_name_ar'], stock['id']
+            
+            # 🔔 مفتاح الأمان: بيترست لكل سهم جديد عشان يبعتله مرة واحدة بس
+            notified_this_run = False 
+            
             encoded_query = build_smart_query(name_ar, symbol)
             rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ar&gl=EG&ceid=EG:ar"
 
@@ -1177,73 +1179,114 @@ def process_stocks(stocks_list):
 
                 if not content or len(content) < 400:
                     try:
-                        # هنبعت اللينك وكود الصفحة للروتر الذكي بتاعنا
                         content = extract_smart_content(final_url, driver.page_source)
                     except Exception as e: 
                         print(f"      ⚠️ Smart Extraction Error: {e}")
 
-                save_news_to_db(stock_id, symbol, title, rss_desc, content, final_url, "Google News", pub_date)
-            
+                # 🔔 التمرير لمفتاح الإشعارات وتحديثه
+                is_saved = save_news_to_db(
+                    stock_id, symbol, title, rss_desc, content, final_url, "Google News", pub_date, 
+                    is_api=False, 
+                    send_alert=not notified_this_run # يبعت ترو لو لسه مبعتناش
+                )
+                
+                # لو اتحفظ الخبر، نقفل مفتاح الإشعارات للسهم ده
+                if is_saved:
+                    notified_this_run = True
+
             time.sleep(random.uniform(2, 4))
     finally:
         print("\n🛑 Closing Chrome Driver...")
         driver.quit()
 
 def process_crypto(crypto_list):
-    print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Top 5 News Per Coin Mode\n{'='*50}")
+    print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Check Top 5 Latest News Per Coin\n{'='*50}")
     
-    # 1. تجميع كل الأخبار المتاحة من المصادر الثابتة
-    all_entries = []
-    for feed_url in CRYPTO_FEEDS:
-        print(f"📡 Gathering news from: {feed_url.split('/')[2]}...")
-        feed = feedparser.parse(feed_url)
-        all_entries.extend(feed.entries)
-
-    # 2. ترتيب الأخبار من الأحدث للأقدم
-    all_entries = sorted(all_entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
-    
-    saved_counts = {coin['id']: 0 for coin in crypto_list}
-    processed_urls = set()
     driver = setup_stock_driver()
-
+    session_processed_titles = [] 
+    
     try:
-        for entry in all_entries:
-            title = entry.title
-            link = entry.link
+        for coin in crypto_list:
+            symbol = coin['symbol'].upper()
+            name_en = coin['company_name_en']
             
-            # 🛡️ الخطوة المفقودة: فحص القائمة السوداء (Blacklist)
-            # لو الرابط من "الشرق" أو أي موقع ممنوع، ارميه فوراً قبل المطابقة
-            if is_blacklisted(link, title):
-                # print(f"      ⏩ Skipped: Blacklisted domain ({link[:30]}...)")
-                continue
+            # 🔔 مفتاح الأمان للعملات
+            notified_this_run = False 
+            
+            query = f'"{name_en}" OR "{symbol}" AND (crypto OR market OR price) when:3d'
+            encoded_query = quote(query)
+            rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
 
-            search_text = (title + " " + entry.get('description', '')).lower()
+            print(f"\n🔎 [{symbol}] Scanning RSS...")
+            feed = feedparser.parse(rss_url)
+            
+            sorted_entries = sorted(feed.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
+            entries_to_check = sorted_entries[:5]
+            print(f"   Found {len(feed.entries)} entries, checking top {len(entries_to_check)} only.")
+            
+            for index, entry in enumerate(entries_to_check, start=1):
+                title = entry.title
+                link = entry.link
+                
+                print(f"   📰 Checking ({index}/5): {title[:50]}...")
+                
+                if is_blacklisted(link, title):
+                    print("      ⏩ Skipped: Blacklisted domain")
+                    continue 
 
-            for coin in crypto_list:
-                c_id = coin['id']
-                symbol = coin['symbol'].lower()
-                name = coin['company_name_en'].lower()
+                is_session_duplicate = False
+                clean_new_title = re.sub(r'[^\w\s]', '', title).lower()
+                for past_title in session_processed_titles:
+                    if SequenceMatcher(None, clean_new_title, past_title).ratio() > 0.80:
+                        is_session_duplicate = True
+                        break
+                        
+                if is_session_duplicate:
+                    print("      🚫 Skipped: Found similar news in this session")
+                    continue
+                
+                fresh, pub_date = is_fresh_news(entry, max_days=3)
+                if not fresh:
+                    print("      ⏩ Skipped: Too old")
+                    continue
 
-                if saved_counts[c_id] < 5:
-                    if f" {symbol} " in f" {search_text} " or name in search_text:
-                        if link not in processed_urls:
-                            saved_counts[c_id] += 1
-                            print(f"   ✨ [{coin['symbol']}] Match found ({saved_counts[c_id]}/5): {title[:50]}...")
-                            
-                            final_url = resolve_url_with_selenium(link, driver)
-                            content = extract_smart_content(final_url, driver.page_source)
+                if is_duplicate_news(coin['id'], title):
+                    continue
 
-                            if content:
-                                save_news_to_db(c_id, coin['symbol'], title, "", content, final_url, "Crypto Intelligence", datetime.now(timezone.utc))
-                                processed_urls.add(link)
-                                break 
-        
-        print(f"\n✅ Crypto Processing Finished. Stats: {saved_counts}")
+                print("      🚀 Resolving URL...")
+                final_url = resolve_url_with_selenium(link, driver)
+                
+                rss_desc = clean_html(entry.description) if 'description' in entry else ""
+                content_for_ai = f"{title}. {rss_desc}"
+
+                # 🔔 التمرير لمفتاح الإشعارات للعملة
+                is_saved = save_news_to_db(
+                    stock_id=coin['id'], 
+                    symbol=symbol, 
+                    title=title, 
+                    description=rss_desc[:500], 
+                    content=content_for_ai, 
+                    url=final_url, 
+                    source="Google Crypto News", 
+                    pub_date=pub_date,
+                    is_api=True,
+                    send_alert=not notified_this_run # يبعت إشعار لو دي أول مرة
+                )
+                
+                # تحديث الذاكرة والمفتاح
+                if is_saved:
+                    session_processed_titles.append(clean_new_title)
+                    notified_this_run = True # يقفل الحنفية للعملة دي
+            
+            time.sleep(random.uniform(1, 2))
+            
+    except Exception as e:
+        print(f"      🚨 Crypto Engine Error: {e}")
     finally:
+        print("\n🛑 Closing Chrome Driver (Crypto)...")
         driver.quit()
 
-
-
+        
 if __name__ == "__main__":
     start_time = datetime.now()
     print(f"🚀 Job Started: {start_time}")
@@ -1255,7 +1298,10 @@ if __name__ == "__main__":
         crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
         stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
 
+        # تشغيل محرك الكريبتو (RSS)
         if crypto: process_crypto(crypto)
+        
+        # تشغيل محرك الأسهم (RSS + Scraping)
         if stocks: process_stocks(stocks)
 
     except Exception as e: 
