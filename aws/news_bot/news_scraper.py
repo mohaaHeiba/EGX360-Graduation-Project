@@ -46,8 +46,7 @@ if not firebase_admin._apps:
 
 print("🤖 Loading FinBERT model for English news (Offline Hugging Face)...")
 # تحميل موديل FinBERT للإنجليزي (متدرب على الأخبار المالية)
-finbert = pipeline("text-classification", model="ProsusAI/finbert", truncation=True, max_length=512)
-
+finbert = pipeline("text-classification", model="ProsusAI/finbert", truncation=True, max_length=512, device=-1)
 # ==============================================================================
 # 2. AI Processing Functions
 # ==============================================================================
@@ -214,7 +213,7 @@ def clean_and_validate_content(text, description, title):
 def is_blacklisted(url, title=""):
     url_lower = url.lower()
     
-    bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search","asharqbusiness.com"]
+    bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search","asharqbusiness.com","decrypt.co"]
     for domain in bad_domains:
         if domain in url_lower: 
             return True
@@ -964,12 +963,6 @@ def scrape_cointelegraph(soup):
         return content_div.get_text(separator="\n\n").strip()
     return None
 
-def scrape_decrypt(soup):
-    """تنظيف موقع Decrypt"""
-    content_div = soup.find('div', class_='post-content') or soup.find('article')
-    if content_div:
-        return content_div.get_text(separator="\n\n").strip()
-    return None
 
 def scrape_cryptoslate(soup):
     """تنظيف موقع CryptoSlate"""
@@ -982,7 +975,6 @@ def scrape_cryptoslate(soup):
 CRYPTO_FEEDS = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cointelegraph.com/rss",
-    "https://decrypt.co/feed",
     "https://coingape.com/feed/",
     "https://cryptoslate.com/feed/"
 ]
@@ -1005,10 +997,8 @@ SCRAPERS = {
     "ahram.org.eg": scrape_ahram,
     "dostor.org": scrape_dostor,
     "alborsaanews.com": scrape_alborsaanews,
-    "coingape.com": scrape_coingape,
-    "coindesk.com": scrape_coindesk,
+    "coingape.com": scrape_coingape, "coindesk.com": scrape_coindesk,
     "cointelegraph.com": scrape_cointelegraph,
-    "decrypt.co": scrape_decrypt,
     "cryptoslate.com": scrape_cryptoslate
 }
 
@@ -1182,53 +1172,57 @@ def process_stocks(stocks_list):
         driver.quit()
 
 
-
-
 def process_crypto(crypto_list):
-    print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Fixed Sources (Speed Mode)\n{'='*50}")
+    print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Top 5 News Per Coin Mode\n{'='*50}")
     
-    # خريطة العملات لسرعة المطابقة
-    coin_map = {coin['symbol'].lower(): coin['id'] for coin in crypto_list}
-    # إضافة الأسماء الكاملة للمطابقة (بشرط تكون كلمة واحدة زي bitcoin)
-    for coin in crypto_list:
-        name_key = coin['company_name_en'].lower().replace(" ", "")
-        coin_map[name_key] = coin['id']
+    # 1. تجميع كل الأخبار المتاحة من المصادر الثابتة
+    all_entries = []
+    for feed_url in CRYPTO_FEEDS:
+        print(f"📡 Gathering news from: {feed_url.split('/')[2]}...")
+        feed = feedparser.parse(feed_url)
+        all_entries.extend(feed.entries)
 
-    driver = setup_stock_driver()
+    # 2. ترتيب الأخبار من الأحدث للأقدم
+    all_entries = sorted(all_entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
+    
+    # 3. قاموس لمتابعة عدد الأخبار المحفوظة (لكل ID عملة)
+    # تأكد إن القاموس ده "بره" اللوب بتاع الأخبار
+    saved_counts = {coin['id']: 0 for coin in crypto_list}
     processed_urls = set()
+    driver = setup_stock_driver()
 
     try:
-        for feed_url in CRYPTO_FEEDS:
-            print(f"📡 Scanning Feed: {feed_url.split('/')[2]}...")
-            feed = feedparser.parse(feed_url)
-            
-            for entry in feed.entries[:10]: # أحدث 10 أخبار من كل سورس
-                title = entry.title
-                if entry.link in processed_urls: continue
+        for entry in all_entries:
+            title = entry.title
+            link = entry.link
+            search_text = (title + " " + entry.get('description', '')).lower()
 
-                # 🧠 المطابقة الذكية بالـ Symbol أو الاسم
-                matched_id = None
-                matched_symbol = None
-                search_box = (title + " " + entry.get('description', '')).lower()
-                
-                for key, c_id in coin_map.items():
-                    if f" {key} " in f" {search_box} ":
-                        matched_id = c_id
-                        matched_symbol = key.upper()
-                        break
-                
-                if matched_id:
-                    print(f"      ✅ Match Found [{matched_symbol}]: {title[:50]}...")
-                    final_url = resolve_url_with_selenium(entry.link, driver)
-                    
-                    # الروتر هنا هيعرف يختار المنظف الصح أوتوماتيك
-                    content = extract_smart_content(final_url, driver.page_source)
+            # لف على العملات وشوف الخبر ده يخص مين
+            for coin in crypto_list:
+                c_id = coin['id']
+                symbol = coin['symbol'].lower()
+                name = coin['company_name_en'].lower()
 
-                    if content:
-                        save_news_to_db(matched_id, matched_symbol, title, "", content, final_url, "Crypto Intelligence", datetime.now(timezone.utc))
-                        processed_urls.add(entry.link)
+                # لو العملة دي لسه محتاجة أخبار (< 5) والخبر يخصها
+                if saved_counts[c_id] < 5:
+                    if f" {symbol} " in f" {search_text} " or name in search_text:
+                        if link not in processed_urls:
+                            # تحديث العداد "قبل" الطباعة عشان يظهر (1/5, 2/5...)
+                            saved_counts[c_id] += 1
+                            print(f"   ✨ [{coin['symbol']}] Match found ({saved_counts[c_id]}/5): {title[:50]}...")
+                            
+                            final_url = resolve_url_with_selenium(link, driver)
+                            content = extract_smart_content(final_url, driver.page_source)
+
+                            if content:
+                                save_news_to_db(c_id, coin['symbol'], title, "", content, final_url, "Crypto Intelligence", datetime.now(timezone.utc))
+                                processed_urls.add(link)
+                                break # اخرج من لفة العملات للخبر الحالي
+        
+        print(f"\n✅ Crypto Processing Finished. Stats: {saved_counts}")
     finally:
         driver.quit()
+
 if __name__ == "__main__":
     start_time = datetime.now()
     print(f"🚀 Job Started: {start_time}")
@@ -1238,10 +1232,10 @@ if __name__ == "__main__":
         print(f"✅ Loaded {len(all_stocks)} items from DB")
 
         crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
-        # stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
+        stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
 
         if crypto: process_crypto(crypto)
-        # if stocks: process_stocks(stocks)
+        if stocks: process_stocks(stocks)
 
     except Exception as e: 
         print(f"\n🚨 CRITICAL ERROR: {e}")
