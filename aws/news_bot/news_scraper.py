@@ -213,7 +213,7 @@ def clean_and_validate_content(text, description, title):
 def is_blacklisted(url, title=""):
     url_lower = url.lower()
     
-    bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search","asharqbusiness.com","decrypt.co"]
+    bad_domains = ["facebook.com", "twitter.com", "instagram.com", "youtube.com", "google.com/search","asharqbusiness.com","akher.news","fath-news.com"]
     for domain in bad_domains:
         if domain in url_lower: 
             return True
@@ -253,15 +253,33 @@ def is_fresh_news(entry, max_days=3):
 
 def is_duplicate_news(stock_id, new_title):
     try:
-        res = supabase.table("stock_news").select("title").eq("stock_id", stock_id).order("created_at", desc=True).limit(10).execute()
+        # بنجيب آخر 15 خبر للشركة دي عشان نوسع دايرة البحث
+        res = supabase.table("stock_news").select("title").eq("stock_id", stock_id).order("created_at", desc=True).limit(15).execute()
         if not res.data: return False
-        new_title_clean = re.sub(r'[^\w\s]', '', new_title)
+        
+        # تنظيف العنوان الجديد (مسح المسافات الزيادة والرموز)
+        clean_new = re.sub(r'[^\w\s]', '', new_title).strip().lower()
+        
         for news in res.data:
-            similarity = SequenceMatcher(None, new_title_clean, re.sub(r'[^\w\s]', '', news['title'])).ratio()
-            if similarity > 0.70: return True
+            clean_old = re.sub(r'[^\w\s]', '', news['title']).strip().lower()
+            
+            # 1. فحص التطابق الحرفي (بعد التنظيف)
+            if clean_new == clean_old: return True
+            
+            # 2. فحص التشابه النسبي (خليناها 80% عشان نكون أدق)
+            similarity = SequenceMatcher(None, clean_new, clean_old).ratio()
+            if similarity > 0.80: 
+                return True
+                
+            # 3. 🧠 فحص "احتواء الكلمات" (لو العنوان الجديد شايل 90% من كلمات القديم)
+            words_new = set(clean_new.split())
+            words_old = set(clean_old.split())
+            common_words = words_new.intersection(words_old)
+            if len(common_words) / max(len(words_new), 1) > 0.85:
+                return True
+                
         return False
     except: return False
-
 def send_notification(symbol, news_title, news_url):
     try:
         res = supabase.table("user_watchlist").select("profiles(fcm_token)").eq("stock_symbol", symbol).execute()
@@ -1171,7 +1189,6 @@ def process_stocks(stocks_list):
         print("\n🛑 Closing Chrome Driver...")
         driver.quit()
 
-
 def process_crypto(crypto_list):
     print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Top 5 News Per Coin Mode\n{'='*50}")
     
@@ -1185,8 +1202,6 @@ def process_crypto(crypto_list):
     # 2. ترتيب الأخبار من الأحدث للأقدم
     all_entries = sorted(all_entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
     
-    # 3. قاموس لمتابعة عدد الأخبار المحفوظة (لكل ID عملة)
-    # تأكد إن القاموس ده "بره" اللوب بتاع الأخبار
     saved_counts = {coin['id']: 0 for coin in crypto_list}
     processed_urls = set()
     driver = setup_stock_driver()
@@ -1195,19 +1210,23 @@ def process_crypto(crypto_list):
         for entry in all_entries:
             title = entry.title
             link = entry.link
+            
+            # 🛡️ الخطوة المفقودة: فحص القائمة السوداء (Blacklist)
+            # لو الرابط من "الشرق" أو أي موقع ممنوع، ارميه فوراً قبل المطابقة
+            if is_blacklisted(link, title):
+                # print(f"      ⏩ Skipped: Blacklisted domain ({link[:30]}...)")
+                continue
+
             search_text = (title + " " + entry.get('description', '')).lower()
 
-            # لف على العملات وشوف الخبر ده يخص مين
             for coin in crypto_list:
                 c_id = coin['id']
                 symbol = coin['symbol'].lower()
                 name = coin['company_name_en'].lower()
 
-                # لو العملة دي لسه محتاجة أخبار (< 5) والخبر يخصها
                 if saved_counts[c_id] < 5:
                     if f" {symbol} " in f" {search_text} " or name in search_text:
                         if link not in processed_urls:
-                            # تحديث العداد "قبل" الطباعة عشان يظهر (1/5, 2/5...)
                             saved_counts[c_id] += 1
                             print(f"   ✨ [{coin['symbol']}] Match found ({saved_counts[c_id]}/5): {title[:50]}...")
                             
@@ -1217,11 +1236,13 @@ def process_crypto(crypto_list):
                             if content:
                                 save_news_to_db(c_id, coin['symbol'], title, "", content, final_url, "Crypto Intelligence", datetime.now(timezone.utc))
                                 processed_urls.add(link)
-                                break # اخرج من لفة العملات للخبر الحالي
+                                break 
         
         print(f"\n✅ Crypto Processing Finished. Stats: {saved_counts}")
     finally:
         driver.quit()
+
+
 
 if __name__ == "__main__":
     start_time = datetime.now()
