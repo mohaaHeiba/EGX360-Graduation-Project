@@ -1,4 +1,7 @@
 
+import os
+
+from dotenv import load_dotenv
 import pandas as pd
 import time
 import datetime
@@ -7,38 +10,45 @@ from tvDatafeed import TvDatafeed, Interval
 from supabase import create_client, Client
 
 # ==========================================
-# 🛑 كتم رغاي الـ TradingView (تنظيف اللوجات)
+# Clean logs for TradingView 
 # ==========================================
 logging.getLogger("tvDatafeed").setLevel(logging.CRITICAL)
 
 # ==========================================
-# ⚙️ إعدادات الاتصال (Supabase)
+#  Supabase
 # ==========================================
-SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
+# print(f"URL: {SUPABASE_URL}, KEY: {SUPABASE_KEY}")
 
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 1️⃣ جلب الأسهم المصرية فقط
+# Get only stocks EG
 def get_egx_stocks():
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
     return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API' and s['sector'] not in ['Crypto', 'Materials']]
 
-# 2️⃣ إعدادات الوقت والتواريخ
+#==============================================================================================================================
+# Time
 EXCHANGE = "EGX"
 TIMEFRAME_LABEL = "1m"
 START_TIME = datetime.time(10, 0)
 END_TIME = datetime.time(14, 30)
 
-start_date = datetime.date(2026, 3, 8)
+start_date = datetime.date(2026,4 , 14)
 end_date = datetime.date.today()
 
 all_days = pd.date_range(start=start_date, end=end_date)
 trading_days = [d.date() for d in all_days if d.weekday() not in [4, 5]]
 
-# ==========================================
-# 🏁 التنفيذ الرئيسي
+# ==============================================================================================================================
 # ==========================================
 tv = TvDatafeed()
 egx_stocks = get_egx_stocks()
@@ -97,16 +107,13 @@ for stock in egx_stocks:
                         print(f" | ✅ Success ({len(records)} candles) [Attempt {attempt}]")
                         day_success = True
                     else:
-                        # لو اليوم تداول بس مفيش داتا (ممكن عطلة رسمية)
                         print(f" | ⚠️ No data found (Holiday?)")
                         day_success = True 
                 else:
-                    # مفيش رد من السيرفر
                     attempt += 1
-                    time.sleep(3) # انتظار قصير قبل المحاولة الجاية
+                    time.sleep(3) 
 
             except Exception:
-                # في حالة الـ Connection Lost بنعمل ريستارت للاتصال
                 tv = TvDatafeed()
                 attempt += 1
                 time.sleep(5)

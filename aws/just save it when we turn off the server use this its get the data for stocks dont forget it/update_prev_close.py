@@ -11,8 +11,15 @@ def get_cairo_now():
     return datetime.now(pytz.timezone('Africa/Cairo'))
 
 # --- Supabase Config ---
-SUPABASE_URL = os.environ.get("SUPABASE_URL") or "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew" # تأكد من وضعه في .env
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
+# print(f"URL: {SUPABASE_URL}, KEY: {SUPABASE_KEY}")
 
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)

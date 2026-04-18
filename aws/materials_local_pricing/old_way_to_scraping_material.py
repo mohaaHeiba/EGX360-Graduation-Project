@@ -1,4 +1,7 @@
+import os
+
 import cloudscraper
+from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, messaging
 from bs4 import BeautifulSoup
@@ -8,11 +11,16 @@ import re
 from supabase import create_client, Client
 
 # --- 1. Configurations ---
-SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
 
-# تأكد من صحة المسار واسم الفولدر (materials)
-SERVICE_ACCOUNT_PATH = "/home/heiba/EGX360_Graduation_Project/aws/materials_local_pricing/service_account.json"
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+SERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), '..', 'service_account.json')
+
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
 TABLE_NAME = "materials_prices"
 NOTIFICATION_THRESHOLD = 5.0
 
@@ -28,9 +36,7 @@ cairo_tz = pytz.timezone('Africa/Cairo')
 # --- 3. Functions ---
 
 def clean_price(text):
-    """الزتونة: بتشيل أي حروف عربي (جنيه، مصري، إلخ) وتسيب الأرقام بس"""
     try:
-        # بنشيل الفواصل وأي حرف مش رقم أو نقطة
         cleaned = re.sub(r'[^\d.]', '', text.replace(',', ''))
         return float(cleaned) if cleaned else None
     except:
@@ -60,14 +66,14 @@ def get_gold_prices_web():
         prices = {}
         rows = soup.find_all("tr")
         
-        print("\n🔍 --- جاري سحب الأسعار وتنظيف الداتا من 'مصري' و 'جنيه' ---")
+        print("\n🔍 --- ---------------------------------------- ---")
         for row in rows:
             cells = row.find_all(["td", "th"])
             if len(cells) >= 2:
                 label = cells[0].get_text(strip=True)
                 for key, prefix in mapping.items():
                     if key in label:
-                        # تنظيف السعر الأول
+                        # clean the price in first
                         val_1 = clean_price(cells[1].get_text(strip=True))
                         
                         # لو فيه خانة تالتة ومفيهاش دولار، يبقى ده سعر شراء
@@ -104,10 +110,10 @@ def save_to_db_logic(prices_dict):
         if res.data:
             record_id = res.data[0]['id']
             supabase.table(TABLE_NAME).update(data).eq("id", record_id).execute()
-            print(f"🔄 [UPDATE]: تم تحديث سجل اليوم (ID: {record_id})")
+            print(f"🔄 [UPDATE]: Data (ID: {record_id})")
         else:
             supabase.table(TABLE_NAME).insert(data).execute()
-            print(f"🆕 [INSERT]: تم إضافة سجل جديد ليوم {today_date}")
+            print(f"🆕 [INSERT]: new data {today_date}")
             
     except Exception as e:
         print(f"   ❌ DB Logic Error: {e}")
@@ -119,16 +125,16 @@ def send_bulk_notification(current_price, diff):
         if not tokens: return
 
         change_icon = "🔼" if diff > 0 else "🔽"
-        display_title = "تحديث سعر الذهب 🟡"
-        display_body = f"عيار 21 الآن {current_price:,.0f} ج.م ({change_icon} {diff:+.0f} ج.م)"
-
+        display_title = "Gold Price Update 🟡"
+        display_body = f"21K Gold is now {current_price:,.0f} EGP ({change_icon} {diff:+.0f} EGP)"
+        
         message = messaging.MulticastMessage(
             notification=messaging.Notification(title=display_title, body=display_body),
             android=messaging.AndroidConfig(priority='high', notification=messaging.AndroidNotification(channel_id='gold_price_alerts', color='#DAA520')),
             tokens=tokens
         )
         messaging.send_each_for_multicast(message)
-        print(f"   🔔 FCM: تم إرسال التنبيهات.")
+        print(f"   🔔 FCM: ")
     except Exception as e:
         print(f"   ❌ FCM Error: {e}")
 
@@ -150,7 +156,7 @@ def main():
 
         save_to_db_logic(web_prices)
     else:
-        print("❌ فشل السحب: تأكد من اتجاه البيانات في الموقع.")
+        print("❌ We cooked.")
 
     print(f"{'='*55}\n")
 

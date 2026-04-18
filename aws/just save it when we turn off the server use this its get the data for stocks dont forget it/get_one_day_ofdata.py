@@ -1,3 +1,6 @@
+import os
+
+from dotenv import load_dotenv
 import pandas as pd
 import time
 import datetime
@@ -5,25 +8,32 @@ from tvDatafeed import TvDatafeed, Interval
 from supabase import create_client, Client
 
 # ==========================================
-# ⚙️ إعدادات الاتصال
+# Setup
 # ==========================================
 
-SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
+# print(f"URL: {SUPABASE_URL}, KEY: {SUPABASE_KEY}")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_stocks_metadata():
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
     return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API']
+# ==============================================================================================================================
 
 TIMEFRAME_LABEL = "1d"
-start_date = datetime.date(2026, 3, 5)
+start_date = datetime.date(2026, 4, 14)
 end_date = datetime.date.today()
 date_range = pd.date_range(start=start_date, end=end_date)
 
-# ==========================================
-# 🏁 التنفيذ الرئيسي مع Retry Logic
+# ==============================================================================================================================
 # ==========================================
 tv = TvDatafeed()
 stocks_to_process = fetch_stocks_metadata()
@@ -44,7 +54,6 @@ for stock in stocks_to_process:
 
     print(f"\n📥 Processing {symbol} | Exchange: {current_exchange}")
 
-    # --- بداية جزء الـ Retry ---
     attempt = 1
     data = None
     
@@ -57,7 +66,6 @@ for stock in stocks_to_process:
                 n_bars=50 
             )
             
-            # لو الداتا جت والـ DataFrame مش فاضي نكسر اللوب ونكمل
             if data is not None and not data.empty:
                 print(f"   ✅ Data fetched successfully on attempt {attempt}")
                 break
@@ -66,22 +74,18 @@ for stock in stocks_to_process:
         
         except Exception as e:
             print(f"   ❌ Attempt {attempt} failed (Error: {e}). Retrying in 5s...")
-            # في حالة "Connection Lost" يفضل أحياناً إعادة تعريف الـ tv object
             tv = TvDatafeed() 
         
         attempt += 1
-        time.sleep(5) # انتظر 5 ثواني قبل المحاولة القادمة لتجنب البلوك
+        time.sleep(5) # Wait 5 seconds for block
         
-        # اختيار اختياري: لو المحاولات زادت عن 10 مثلاً ممكن تسكب السهم ده
         if attempt > 10:
             print(f"   🛑 Giving up on {symbol} after 10 failed attempts.")
             break
 
     if data is None or data.empty:
-        continue # لو فشل بعد كل المحاولات ادخل على السهم اللي بعده
-    # --- نهاية جزء الـ Retry ---
+        continue
 
-    # تكملة الكود (نفس منطقك الأصلي)
     data.reset_index(inplace=True)
     data.columns = [col.split(':')[-1].lower() for col in data.columns]
     data.rename(columns={'datetime': 'timestamp', 'date': 'timestamp', 'time': 'timestamp'}, inplace=True)

@@ -1,3 +1,4 @@
+import os
 import time
 import re
 import undetected_chromedriver as uc
@@ -5,12 +6,22 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, timezone
 from supabase import create_client, Client
+from dotenv import load_dotenv
 
 # ==============================================================================
 # 1. SETUP
 # ==============================================================================
-SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
+
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
+print(f"URL: {SUPABASE_URL}, KEY: {SUPABASE_KEY}")
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==============================================================================
@@ -29,7 +40,6 @@ def setup_driver():
 # 3. FORMATTING (Updated to M, B, T)
 # ==============================================================================
 def format_large_number(num_str, multiply_by_1000=False):
-    """تنسيق الأرقام (T, B, M) بالإنجليزية"""
     try:
         clean = float(re.sub(r'[^\d.]', '', num_str))
         if multiply_by_1000:
@@ -54,7 +64,7 @@ def save_to_supabase(market_cap, value_traded):
         now_utc = datetime.now(timezone.utc)
         today_date_str = now_utc.strftime('%Y-%m-%d') 
         
-        # البيانات بدون market_status
+        # market_status
         data_payload = {
             "market_cap": market_cap,
             "value_traded": value_traded,
