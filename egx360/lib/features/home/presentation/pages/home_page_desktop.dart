@@ -258,6 +258,15 @@ class HomePageDesktop extends GetView<HomeController> {
         ),
 
         // Notifications
+        IconButton(
+          onPressed: () => Get.toNamed(AppPages.chatbotPage),
+          icon: Icon(
+            Icons.smart_toy_rounded,
+            color: context.onSurface.withOpacity(0.6),
+          ),
+          tooltip: 'EGX AI',
+        ),
+        
         NotificationDropdown(
           child: Stack(
             clipBehavior: Clip.none,

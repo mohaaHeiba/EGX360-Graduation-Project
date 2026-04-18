@@ -130,7 +130,6 @@ class _OrderSheetState extends State<OrderSheet> {
           const SizedBox(height: 24),
 
           // Summary
-          // Summary
           _buildSummary(context, currentPrice),
           const SizedBox(height: 16),
 
@@ -287,17 +286,21 @@ class _OrderSheetState extends State<OrderSheet> {
         price: price,
       );
 
-      // Close the order sheet
+      // Close the order sheet first
       if (context.mounted) Navigator.pop(context);
+
+      // Cache strings BEFORE showing dialog (context is still valid here
+      // since we haven't left this call frame yet)
+      final s = context.s;
 
       // For BUY: show protection setup dialog
       // For SELL: show success snackbar
       if (isBuy) {
-        _showProtectionSetupDialog(symbol);
+        _showProtectionSetupDialog(symbol, s);
       } else {
         Get.snackbar(
-          context.s.order_trade_executed,
-          context.s.order_sold_msg(qty, symbol),
+          s.order_trade_executed,
+          s.order_sold_msg(qty, symbol),
           backgroundColor: AppColors.candleGreen,
           colorText: Colors.white,
           snackPosition: SnackPosition.BOTTOM,
@@ -317,11 +320,27 @@ class _OrderSheetState extends State<OrderSheet> {
     }
   }
 
-  void _showProtectionSetupDialog(String symbol) {
+  /// All localized strings are passed in as [s] so this method never touches
+  /// a BuildContext — eliminating the "widget unmounted" crash that occurred
+  /// because Get.dialog's Obx fired after _OrderSheetState was disposed.
+  void _showProtectionSetupDialog(String symbol, dynamic s) {
     final alertPct = 5.0.obs;
     final liquidationPct = 10.0.obs;
     final autoSellEnabled = true.obs;
     final isSaving = false.obs;
+
+    // Pre-resolve all strings that don't depend on reactive values
+    final protectionTitle = s.order_protection_title as String;
+    final protectionDesc = s.order_protection_desc(symbol) as String;
+    final alertLabel = s.order_alert_threshold as String;
+    final autoSellLabel = s.order_auto_sell as String;
+    final autoSellThresholdLabel = s.order_auto_sell_threshold as String;
+    final skipLabel = s.order_skip as String;
+    final enableLabel = s.order_enable_protection as String;
+    final savingLabel = s.order_saving as String;
+    final tradeExecuted = s.order_trade_executed as String;
+    final boughtMsg = s.order_bought_msg(symbol) as String;
+    final protectionEnabled = s.order_protection_enabled as String;
 
     Get.dialog(
       Obx(
@@ -349,7 +368,7 @@ class _OrderSheetState extends State<OrderSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      context.s.order_protection_title,
+                      protectionTitle,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -358,7 +377,7 @@ class _OrderSheetState extends State<OrderSheet> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      context.s.order_protection_desc(symbol),
+                      protectionDesc,
                       style: TextStyle(
                         fontSize: 12,
                         color: Get.theme.colorScheme.onSurface.withOpacity(0.6),
@@ -376,7 +395,7 @@ class _OrderSheetState extends State<OrderSheet> {
 
               // Alert slider
               _buildDialogSlider(
-                label: context.s.order_alert_threshold,
+                label: alertLabel,
                 value: alertPct.value,
                 min: 1,
                 max: 25,
@@ -423,7 +442,7 @@ class _OrderSheetState extends State<OrderSheet> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          context.s.order_auto_sell,
+                          autoSellLabel,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -449,7 +468,7 @@ class _OrderSheetState extends State<OrderSheet> {
               if (autoSellEnabled.value) ...[
                 const SizedBox(height: 12),
                 _buildDialogSlider(
-                  label: context.s.order_auto_sell_threshold,
+                  label: autoSellThresholdLabel,
                   value: liquidationPct.value,
                   min: alertPct.value,
                   max: 50,
@@ -478,13 +497,15 @@ class _OrderSheetState extends State<OrderSheet> {
                     Expanded(
                       child: Text(
                         autoSellEnabled.value
-                            ? context.s.order_protection_info_both(
-                                alertPct.value.toStringAsFixed(1),
-                                liquidationPct.value.toStringAsFixed(1),
-                              )
-                            : context.s.order_protection_info_alert(
-                                alertPct.value.toStringAsFixed(1),
-                              ),
+                            ? s.order_protection_info_both(
+                                    alertPct.value.toStringAsFixed(1),
+                                    liquidationPct.value.toStringAsFixed(1),
+                                  )
+                                  as String
+                            : s.order_protection_info_alert(
+                                    alertPct.value.toStringAsFixed(1),
+                                  )
+                                  as String,
                         style: TextStyle(
                           fontSize: 11,
                           color: Get.theme.colorScheme.onSurface.withOpacity(
@@ -507,8 +528,8 @@ class _OrderSheetState extends State<OrderSheet> {
                   : () {
                       Get.back();
                       Get.snackbar(
-                        context.s.order_trade_executed,
-                        context.s.order_bought_msg(symbol),
+                        tradeExecuted,
+                        boughtMsg,
                         backgroundColor: AppColors.candleGreen,
                         colorText: Colors.white,
                         snackPosition: SnackPosition.BOTTOM,
@@ -516,7 +537,7 @@ class _OrderSheetState extends State<OrderSheet> {
                       );
                     },
               child: Text(
-                context.s.order_skip,
+                skipLabel,
                 style: TextStyle(
                   color: Get.theme.colorScheme.onSurface.withOpacity(0.5),
                 ),
@@ -542,16 +563,18 @@ class _OrderSheetState extends State<OrderSheet> {
                         );
                         Get.back();
                         final msg = autoSellEnabled.value
-                            ? context.s.order_msg_both(
-                                alertPct.value.toStringAsFixed(1),
-                                liquidationPct.value.toStringAsFixed(1),
-                              )
-                            : context.s.order_msg_alert(
-                                alertPct.value.toStringAsFixed(1),
-                              );
+                            ? s.order_msg_both(
+                                    alertPct.value.toStringAsFixed(1),
+                                    liquidationPct.value.toStringAsFixed(1),
+                                  )
+                                  as String
+                            : s.order_msg_alert(
+                                    alertPct.value.toStringAsFixed(1),
+                                  )
+                                  as String;
                         Get.snackbar(
-                          context.s.order_protection_enabled,
-                          context.s.order_monitoring_msg(symbol, msg),
+                          protectionEnabled,
+                          s.order_monitoring_msg(symbol, msg) as String,
                           backgroundColor: Colors.orange,
                           colorText: Colors.white,
                           snackPosition: SnackPosition.BOTTOM,
@@ -579,11 +602,7 @@ class _OrderSheetState extends State<OrderSheet> {
                       ),
                     )
                   : const Icon(Icons.shield, size: 16),
-              label: Text(
-                isSaving.value
-                    ? context.s.order_saving
-                    : context.s.order_enable_protection,
-              ),
+              label: Text(isSaving.value ? savingLabel : enableLabel),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,

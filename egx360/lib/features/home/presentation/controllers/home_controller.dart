@@ -8,7 +8,7 @@ import 'package:egx/features/home/domain/usecases/get_market_overview.dart';
 import 'package:egx/features/home/domain/usecases/get_watchlist.dart';
 import 'package:egx/features/home/domain/usecases/get_material_price_usecase.dart';
 import 'package:egx/features/home/domain/usecases/get_market_history.dart';
-import 'package:egx/features/currency/domain/usecases/get_live_currency_prices_usecase.dart';
+import 'package:egx/features/assets/domain/usecases/get_currency_live_prices_usecase.dart';
 import 'package:egx/features/home/domain/usecases/remove_from_watchlist.dart';
 import 'package:egx/features/home/domain/usecases/get_stock_details.dart';
 import 'package:egx/core/routes/app_pages.dart';
@@ -23,7 +23,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   final GetWatchlist getWatchlist;
   final GetMaterialPriceUseCase getMaterialPrice;
   final GetMarketHistory getMarketHistory;
-  final GetLiveCurrencyPricesUseCase getLiveCurrencyPrices;
+  final GetCurrencyLivePricesUseCase getLiveCurrencyPrices;
   final RemoveFromWatchlistUseCase removeFromWatchlistUseCase;
   final GetStockDetailsUseCase getStockDetailsUseCase;
 
@@ -292,19 +292,8 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       return;
     }
 
-    // If it's Crypto, navigate to CryptoDetailsPage
-    if (partialStock.sector == 'Crypto' ||
-        partialStock.candleTableName == 'API') {
-      Get.toNamed(
-        AppPages.cryptoDetailsPage,
-        arguments: {
-          ...partialStock.toJson(),
-          'stock_name': partialStock.symbol,
-          'asset_type': 'crypto',
-        },
-      );
-      return;
-    }
+    // Crypto and Currencies are NOT early returned anymore.
+    // They must hit getStockDetailsUseCase to fetch their logo, website, description from Supabase!
 
     try {
       final fullStock = await getStockDetailsUseCase(partialStock.symbol);
@@ -333,20 +322,73 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         stockMap['sparkline_data'] = partialStock.sparklineData;
       }
 
-      Get.toNamed(
-        AppPages.stockDetailsPage,
-        arguments: {
-          ...stockMap,
-          'stock_name': fullStock.symbol,
-          'asset_type': 'stock',
-        },
-      );
+      // Route based on the fullStock's sector (which is reliably from Supabase)
+      if (fullStock.sector == 'Currencies') {
+        Get.toNamed(
+          AppPages.currencyDetailsPage,
+          arguments: {
+            ...stockMap,
+            'stock_name': fullStock.symbol,
+            'asset_type': 'currency',
+            'sector': 'Currencies',
+          },
+        );
+      } else if (fullStock.sector == 'Crypto' || fullStock.candleTableName == 'API') {
+        Get.toNamed(
+          AppPages.cryptoDetailsPage,
+          arguments: {
+            ...stockMap,
+            'stock_name': fullStock.symbol,
+            'asset_type': 'crypto',
+          },
+        );
+      } else {
+        Get.toNamed(
+          AppPages.stockDetailsPage,
+          arguments: {
+            ...stockMap,
+            'stock_name': fullStock.symbol,
+            'asset_type': 'stock',
+          },
+        );
+      }
     } catch (e) {
       // Close dialog if open
       if (Get.isDialogOpen == true) Get.back();
 
       print('Error fetching stock details: $e');
       // Fallback to partial data navigation
+      
+      final fallbackMap = partialStock.toJson();
+      if (partialStock.sector == 'Currencies') {
+        Get.toNamed(
+          AppPages.currencyDetailsPage,
+          arguments: {
+            ...fallbackMap,
+            'stock_name': partialStock.symbol,
+            'asset_type': 'currency',
+            'sector': 'Currencies',
+          },
+        );
+      } else if (partialStock.sector == 'Crypto' || partialStock.candleTableName == 'API') {
+        Get.toNamed(
+          AppPages.cryptoDetailsPage,
+          arguments: {
+            ...fallbackMap,
+            'stock_name': partialStock.symbol,
+            'asset_type': 'crypto',
+          },
+        );
+      } else {
+        Get.toNamed(
+          AppPages.stockDetailsPage,
+          arguments: {
+            ...fallbackMap,
+            'stock_name': partialStock.symbol,
+            'asset_type': 'stock',
+          },
+        );
+      }
     }
   }
 

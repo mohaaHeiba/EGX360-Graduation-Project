@@ -2,6 +2,7 @@ import 'package:egx/core/constants/app_colors.dart';
 import 'package:egx/core/helper/context_extensions.dart';
 import 'package:egx/features/markets/presentation/controllers/markets_controller.dart';
 import 'package:egx/features/markets/presentation/widgets/desktop/technical_gauge.dart';
+import 'package:egx/features/markets/presentation/widgets/shared/seasonals_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -225,46 +226,32 @@ class StockDetailsPanel extends GetView<MarketsController> {
             //   ),
             // ),
 
-            // const SizedBox(height: 24),
-            //
-            // Seasonals Section
-            // Text(
-            //   'Seasonals',
-            //   style: TextStyle(
-            //     fontSize: 14,
-            //     fontWeight: FontWeight.w600,
-            //     color: Colors.grey[200],
-            //   ),
-            // ),
-
-            // const SizedBox(height: 16),
-
-            // SeasonalsChart(
-            //   onMoreTap: () {
-            //     // TODO: Navigate to detailed seasonals
-            //   },
-            // ),
-            const SizedBox(height: 28),
-
-            // Technicals Section
-            Text(
-              context.s.details_technicals,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[200],
+            if (controller.aiPrediction.value != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'AI Prediction',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[200],
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+              TechnicalGauge(
+                value: controller.aiPrediction.value!.score,
+                isAi: true,
+                customRecommendation:
+                    'AI: ${controller.aiPrediction.value!.recommendation}',
+                onMoreTap: () {
+                  // TODO: Navigate to detailed AI prediction
+                },
+              ),
+            ],
 
-            const SizedBox(height: 16),
-
-            TechnicalGauge(
-              value: controller.technicalResult.value?.score ?? 0,
-              result: controller.technicalResult.value,
-              onMoreTap: () {
-                // TODO: Navigate to detailed technicals
-              },
-            ),
+            const SizedBox(height: 24),
+            
+            // Seasonals Section
+            const SeasonalsChart(),
 
             const SizedBox(height: 20),
           ],

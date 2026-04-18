@@ -26,4 +26,10 @@ abstract class AssetRepository {
 
   /// Fetch material prices (Gold/Silver)
   Future<MaterialPriceEntity> getMaterialPrice();
+
+  /// Fetch live forex rates (Currency)
+  Future<Map<String, double>> getCurrencyLivePrices();
+
+  /// Fetch forex historical rates (Currency)
+  Future<List<CandleEntity>> getCurrencyHistory(String symbol, int days);
 }

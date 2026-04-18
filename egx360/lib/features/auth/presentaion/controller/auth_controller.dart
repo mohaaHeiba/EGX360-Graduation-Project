@@ -6,7 +6,7 @@ import 'package:egx/core/helper/context_extensions.dart';
 import 'package:egx/core/routes/app_pages.dart';
 import 'package:egx/core/errors/app_exception.dart';
 import 'package:egx/core/services/network_service.dart';
-
+import 'package:egx/core/services/desktop_deep_link_service.dart';
 import 'package:egx/features/auth/domain/repository/auth_repository.dart';
 import 'package:egx/generated/l10n.dart';
 import 'package:flutter/cupertino.dart';
@@ -123,12 +123,12 @@ class AuthController extends GetxController {
     _verificationTimer?.cancel();
 
     if (GetStorage().read('loginBefore') != true) {
-      print("🆕 First time login detected! Setting shouldShowWelcome = true");
-      GetStorage().write('shouldShowWelcome', true);
+      print("🆕 First time login detected! Navigating to onboarding");
+      GetStorage().write('shouldShowWelcome', false);
       GetStorage().write('loginBefore', true);
 
       Future.delayed(const Duration(seconds: 2), () {
-        Get.offAllNamed(AppPages.layoutPage);
+        Get.offAllNamed(AppPages.onboardingPage);
       });
     } else {
       print(
@@ -505,9 +505,10 @@ class AuthController extends GetxController {
   Future<void> _handleDeepLink(Uri uri) async {
     print('🔗 Deep Link Received: $uri');
 
-    // Verify it's our custom scheme
-    if (uri.scheme != 'io.supabase.flutter') {
-      print('⚠️ Ignoring non-app deep link: ${uri.scheme}');
+    // Verify it's our custom scheme or localhost
+    if (uri.scheme != 'io.supabase.flutter' && 
+        !(uri.scheme == 'http' && uri.host == 'localhost' && uri.port == 54321)) {
+      print('⚠️ Ignoring non-app deep link: $uri');
       return;
     }
 
@@ -518,6 +519,13 @@ class AuthController extends GetxController {
 
       // If we reach here, the session was successfully created
       print('✅ Session obtained from deep link!');
+
+      if (uri.path.contains('reset-password')) {
+         print("🔑 Password Reset link detected. Navigating to New Password Page.");
+         goToNewPass();
+         return;
+      }
+
       _completeLogin();
     } catch (e) {
       print('❌ Error handling deep link: $e');
@@ -546,6 +554,16 @@ class AuthController extends GetxController {
         print('❌ Deep Link Stream Error: $err');
       },
     );
+
+    // Initialize Desktop Deep Link Listener if on desktop
+    try {
+      DesktopDeepLinkService();
+      DesktopDeepLinkService().uriStream.listen((uri) {
+        _handleDeepLink(uri);
+      });
+    } catch (e) {
+      print('❌ Desktop Deep Link Initialization Error: $e');
+    }
 
     // Handle initial link (when app is opened via deep link)
     _handleInitialLink();

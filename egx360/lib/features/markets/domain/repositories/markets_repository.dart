@@ -1,3 +1,4 @@
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:egx/features/search/domain/entities/stock_entity.dart';
 import 'package:egx/features/search/domain/entities/candle_entity.dart';
 
@@ -21,4 +22,7 @@ abstract class MarketsRepository {
     required DateTime before,
     int? limit,
   });
+
+  /// Get the latest AI prediction for a symbol
+  Future<AiPrediction?> getLatestAiPrediction(String symbol);
 }

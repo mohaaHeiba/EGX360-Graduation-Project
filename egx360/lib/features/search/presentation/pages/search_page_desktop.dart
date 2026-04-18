@@ -275,6 +275,7 @@ class SearchPageDesktop extends GetView<SearchStocksController> {
       context.s.search_cat_indices,
       context.s.search_cat_crypto,
       context.s.search_cat_materials,
+      'Currencies',
     ];
 
     return SizedBox(

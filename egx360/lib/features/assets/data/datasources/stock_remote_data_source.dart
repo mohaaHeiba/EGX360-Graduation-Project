@@ -111,7 +111,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   Future<MaterialPriceModel> fetchMaterialPrice() async {
     try {
       final response = await client
-          .from('material_prices')
+          .from('materials_prices')
           .select()
           .order('timestamp', ascending: false)
           .limit(1)

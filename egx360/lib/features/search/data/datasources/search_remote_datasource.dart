@@ -1,3 +1,4 @@
+import 'package:egx/features/markets/data/models/ai_prediction_model.dart';
 import 'package:egx/features/search/data/models/candle_model.dart';
 import 'package:egx/features/search/data/models/news_model.dart';
 import 'package:egx/features/search/data/models/stock_model.dart';
@@ -38,6 +39,7 @@ abstract class SearchRemoteDataSource {
 
   Future<MaterialPriceModel?> getLatestMaterialPrice();
   Future<StockModel> getStockBySymbol(String symbol);
+  Future<AiPredictionModel?> getLatestAiPrediction(String symbol);
 }
 
 class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
@@ -55,11 +57,16 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
     if (category == 'Materials') {
       dbQuery = dbQuery.eq('sector', 'Materials');
     } else if (category == 'Stocks') {
-      dbQuery = dbQuery.neq('sector', 'Materials').neq('sector', 'Crypto');
+      dbQuery = dbQuery
+          .neq('sector', 'Materials')
+          .neq('sector', 'Crypto')
+          .neq('sector', 'Currencies');
     } else if (category == 'Crypto') {
       dbQuery = dbQuery.eq('sector', 'Crypto');
     } else if (category == 'Indices') {
       dbQuery = dbQuery.eq('sector', 'Indices');
+    } else if (category == 'Currencies') {
+      dbQuery = dbQuery.eq('sector', 'Currencies');
     }
 
     final response = await dbQuery
@@ -75,6 +82,9 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
     // Fetch latest price for each stock
     final updatedStocks = await Future.wait(
       stocks.map((stock) async {
+        // Currencies use Google Sheets API — skip Binance, price shown in detail page
+        if (stock.sector == 'Currencies') return stock;
+
         if (stock.sector == 'Crypto' || stock.candleTableName == 'API') {
           try {
             final url = Uri.parse(
@@ -124,11 +134,16 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
     if (category == 'Materials') {
       dbQuery = dbQuery.eq('sector', 'Materials');
     } else if (category == 'Stocks') {
-      dbQuery = dbQuery.neq('sector', 'Materials').neq('sector', 'Crypto');
+      dbQuery = dbQuery
+          .neq('sector', 'Materials')
+          .neq('sector', 'Crypto')
+          .neq('sector', 'Currencies');
     } else if (category == 'Crypto') {
       dbQuery = dbQuery.eq('sector', 'Crypto');
     } else if (category == 'Indices') {
       dbQuery = dbQuery.eq('sector', 'Indices');
+    } else if (category == 'Currencies') {
+      dbQuery = dbQuery.eq('sector', 'Currencies');
     }
 
     dbQuery = dbQuery.range(offset, offset + limit - 1);
@@ -141,6 +156,9 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
     // Fetch latest price for each stock
     final updatedStocks = await Future.wait(
       stocks.map((stock) async {
+        // Currencies use Google Sheets API — skip Binance, price shown in detail page
+        if (stock.sector == 'Currencies') return stock;
+
         if (stock.sector == 'Crypto' || stock.candleTableName == 'API') {
           try {
             final url = Uri.parse(
@@ -196,9 +214,12 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
     } else if (category == 'Stocks' || category == 'Indices') {
       dbQuery = dbQuery
           .neq('stocks.sector', 'Materials')
-          .neq('stocks.sector', 'Crypto');
+          .neq('stocks.sector', 'Crypto')
+          .neq('stocks.sector', 'Currencies');
     } else if (category == 'Crypto') {
       dbQuery = dbQuery.eq('stocks.sector', 'Crypto');
+    } else if (category == 'Currencies') {
+      dbQuery = dbQuery.eq('stocks.sector', 'Currencies');
     }
 
     final response = await dbQuery
@@ -334,7 +355,10 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
     StockModel stock = StockModel.fromJson(response);
 
     // 2. Fetch latest price
-    if (stock.sector == 'Crypto' || stock.candleTableName == 'API') {
+    // Currencies use Google Sheets API — skip Binance, price shown in detail page
+    if (stock.sector == 'Currencies') {
+      return stock;
+    } else if (stock.sector == 'Crypto' || stock.candleTableName == 'API') {
       try {
         final url = Uri.parse(
           'https://api.binance.com/api/v3/ticker/price?symbol=${stock.symbol}USDT',
@@ -389,7 +413,7 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
   @override
   Future<MaterialPriceModel?> getLatestMaterialPrice() async {
     final response = await supabase
-        .from('material_prices')
+        .from('materials_prices')
         .select()
         .order('timestamp', ascending: false)
         .limit(1)
@@ -397,5 +421,24 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
 
     if (response == null) return null;
     return MaterialPriceModel.fromJson(response);
+  }
+
+  @override
+  Future<AiPredictionModel?> getLatestAiPrediction(String symbol) async {
+    try {
+      final response = await supabase
+          .from('ai_predictions')
+          .select()
+          .eq('symbol', symbol)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return AiPredictionModel.fromMap(response);
+    } catch (e) {
+      print('Error fetching AI prediction: $e');
+      return null;
+    }
   }
 }

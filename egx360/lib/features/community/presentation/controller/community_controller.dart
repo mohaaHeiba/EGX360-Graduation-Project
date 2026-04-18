@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:egx/core/routes/app_pages.dart';
+import 'package:egx/features/auth/data/model/auth_model.dart';
 import 'package:egx/features/community/domain/usecase/get_all_posts_usecase.dart';
 import 'package:egx/features/community/domain/usecase/get_stocks_usecase.dart';
 import 'package:egx/features/community/domain/entity/stock_entity.dart';
+import 'package:egx/features/community/domain/repositories/community_repository.dart';
 import 'package:egx/features/profile/domain/entity/post_entity.dart';
 import 'package:egx/features/profile/domain/usecase/interaction_usecases.dart';
+import 'package:egx/features/profile/data/datasources/profile_remote_data_source.dart';
 import 'package:egx/core/constants/app_colors.dart';
 import 'package:egx/core/custom/custom_snackbar.dart';
 import 'package:egx/generated/l10n.dart';
@@ -17,6 +20,7 @@ class CommunityController extends GetxController {
   final TogglePostVoteUseCase togglePostVoteUseCase = Get.find();
   final ToggleBookmarkUseCase toggleBookmarkUseCase = Get.find();
   final GetStocksUseCase getStocksUseCase = Get.find();
+  final CommunityRepository communityRepository = Get.find();
 
   var posts = <PostEntity>[].obs;
   var stocks = <StockEntity>[].obs;
@@ -24,7 +28,15 @@ class CommunityController extends GetxController {
   var isPaginationLoading = false.obs;
   var isMoreDataAvailable = true.obs;
 
-  // Pagination
+  // ── Trending Topics ──
+  var trendingTopics = <Map<String, dynamic>>[].obs;
+  var isLoadingTrending = false.obs;
+
+  // ── Who to Follow ──
+  var suggestedUsers = <AuthModel>[].obs;
+  var isLoadingSuggested = false.obs;
+  var followedUserIds = <String>{}.obs;
+  var togglingFollowIds = <String>{}.obs;
   int _page = 0;
   final int _limit = 10;
   final ScrollController scrollController = ScrollController();
@@ -83,6 +95,8 @@ class CommunityController extends GetxController {
     super.onInit();
     fetchPosts();
     fetchStocks();
+    fetchTrendingTopics();
+    fetchSuggestedUsers();
     scrollController.addListener(_scrollListener);
   }
 
@@ -153,6 +167,94 @@ class CommunityController extends GetxController {
   Future<void> refreshPosts() async {
     await fetchPosts(refresh: true);
     await fetchStocks();
+    await fetchTrendingTopics();
+    await fetchSuggestedUsers();
+  }
+
+  // ── Trending Topics ──
+
+  Future<void> fetchTrendingTopics() async {
+    if (isLoadingTrending.value) return;
+    isLoadingTrending.value = true;
+    try {
+      final result = await communityRepository.getTrendingTopics(limit: 5);
+      trendingTopics.assignAll(result);
+    } catch (e) {
+      print('Error fetching trending topics: $e');
+    } finally {
+      isLoadingTrending.value = false;
+    }
+  }
+
+  // ── Who to Follow ──
+
+  Future<void> fetchSuggestedUsers() async {
+    if (currentUserId.isEmpty || isLoadingSuggested.value) return;
+    isLoadingSuggested.value = true;
+    try {
+      final users = await communityRepository.getSuggestedUsers(
+        currentUserId,
+        limit: 5,
+      );
+      suggestedUsers.assignAll(users);
+
+      // Load current following IDs for button state
+      final resp = await Supabase.instance.client
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', currentUserId);
+      final ids = (resp as List)
+          .map((e) => e['following_id'] as String)
+          .toSet();
+      followedUserIds.clear();
+      followedUserIds.addAll(ids);
+    } catch (e) {
+      print('Error fetching suggested users: $e');
+    } finally {
+      isLoadingSuggested.value = false;
+    }
+  }
+
+  Future<void> toggleFollowUser(String userId) async {
+    if (currentUserId.isEmpty || togglingFollowIds.contains(userId)) return;
+    togglingFollowIds.add(userId);
+
+    final wasFollowing = followedUserIds.contains(userId);
+
+    // Optimistic update
+    if (wasFollowing) {
+      followedUserIds.remove(userId);
+    } else {
+      followedUserIds.add(userId);
+    }
+    followedUserIds.refresh();
+
+    try {
+      final dataSource = Get.find<ProfileRemoteDataSource>();
+      await dataSource.toggleFollow(
+        followerId: currentUserId,
+        followingId: userId,
+      );
+      // After successfully following, remove from suggestions
+      if (!wasFollowing) {
+        suggestedUsers.removeWhere((u) => u.id == userId);
+      }
+    } catch (e) {
+      // Revert
+      if (wasFollowing) {
+        followedUserIds.add(userId);
+      } else {
+        followedUserIds.remove(userId);
+      }
+      followedUserIds.refresh();
+      customSnackbar(
+        title: S.current.error_label,
+        message: S.current.community_like_failed,
+        color: AppColors.candleRed,
+      );
+    } finally {
+      togglingFollowIds.remove(userId);
+    }
   }
 
   Future<void> toggleLike(int index) async {

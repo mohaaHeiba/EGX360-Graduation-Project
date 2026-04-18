@@ -12,6 +12,7 @@ import 'package:egx/features/markets/presentation/widgets/order_sheet.dart';
 import 'package:egx/features/markets/presentation/widgets/stock_search_item_widget.dart';
 import 'package:egx/features/markets/presentation/widgets/indicators_menu_widget.dart';
 import 'package:egx/features/markets/presentation/widgets/drawing_tools_menu_widget.dart';
+import 'package:egx/features/markets/presentation/widgets/desktop/stock_details_panel.dart';
 import 'package:egx/features/markets/presentation/widgets/markets_chart_shimmer.dart';
 import 'package:egx/features/markets/presentation/utils/chart_formatters.dart';
 import 'package:flutter/material.dart';
@@ -134,6 +135,31 @@ class _MarketsPageMobileState extends State<MarketsPageMobile> {
             symbol: selectedStock.symbol,
             currentPrice: currentPrice,
           ),
+        );
+      },
+    );
+  }
+
+  void _showStockDetailsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: const StockDetailsPanel(),
+            );
+          },
         );
       },
     );
@@ -317,6 +343,7 @@ class _MarketsPageMobileState extends State<MarketsPageMobile> {
                     }
                   },
                   controller: controller,
+                  onShowDetails: () => _showStockDetailsSheet(context),
                 ),
                 const Expanded(child: MarketsChartShimmer()),
                 ChartToolbar(
@@ -397,6 +424,7 @@ class _MarketsPageMobileState extends State<MarketsPageMobile> {
                     }
                   },
                   controller: controller,
+                  onShowDetails: () => _showStockDetailsSheet(context),
                 ),
                 Expanded(
                   child: Center(
@@ -448,6 +476,7 @@ class _MarketsPageMobileState extends State<MarketsPageMobile> {
                     timeframes: _timeframes,
                     onTimeframeSelected: (v) {},
                     controller: controller,
+                    onShowDetails: () => _showStockDetailsSheet(context),
                   ),
                   Expanded(
                     child: Container(
@@ -529,6 +558,7 @@ class _MarketsPageMobileState extends State<MarketsPageMobile> {
                   }
                 },
                 controller: controller,
+                onShowDetails: () => _showStockDetailsSheet(context),
               ),
 
               // Search Results Overlay

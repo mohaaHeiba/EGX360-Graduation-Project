@@ -213,6 +213,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "asset_details_gold_18k": MessageLookupByLibrary.simpleMessage("18k Gold"),
     "asset_details_gold_21k": MessageLookupByLibrary.simpleMessage("21k Gold"),
     "asset_details_gold_24k": MessageLookupByLibrary.simpleMessage("24k Gold"),
+    "asset_details_gold_bar_100g": MessageLookupByLibrary.simpleMessage(
+      "Gold Bar 100g",
+    ),
+    "asset_details_gold_bar_250g": MessageLookupByLibrary.simpleMessage(
+      "Gold Bar 250g",
+    ),
+    "asset_details_gold_bar_50g": MessageLookupByLibrary.simpleMessage(
+      "Gold Bar 50g",
+    ),
+    "asset_details_gold_ounce": MessageLookupByLibrary.simpleMessage(
+      "Gold Ounce",
+    ),
+    "asset_details_gold_pound": MessageLookupByLibrary.simpleMessage(
+      "Gold Pound",
+    ),
     "asset_details_high": MessageLookupByLibrary.simpleMessage("High"),
     "asset_details_index_label": MessageLookupByLibrary.simpleMessage(
       "EGX • Index",
@@ -283,8 +298,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "asset_details_read_full": MessageLookupByLibrary.simpleMessage(
       "Read Full Article",
     ),
-    "asset_details_silver_800": MessageLookupByLibrary.simpleMessage(
-      "Silver 800",
+    "asset_details_silver_925": MessageLookupByLibrary.simpleMessage(
+      "Silver 925",
     ),
     "asset_details_silver_999": MessageLookupByLibrary.simpleMessage(
       "Silver 999",

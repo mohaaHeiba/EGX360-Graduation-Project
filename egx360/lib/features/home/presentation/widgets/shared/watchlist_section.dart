@@ -12,6 +12,7 @@ class WatchlistCard extends StatefulWidget {
   final VoidCallback onDelete;
   final VoidCallback onTap;
   final double usdRate;
+  final double? livePrice;
 
   const WatchlistCard({
     super.key,
@@ -19,6 +20,7 @@ class WatchlistCard extends StatefulWidget {
     required this.onDelete,
     required this.onTap,
     this.usdRate = 1.0,
+    this.livePrice,
   });
 
   @override
@@ -67,10 +69,11 @@ class _WatchlistCardState extends State<WatchlistCard>
     final Color trendColor = isPositive
         ? AppColors.candleGreen
         : AppColors.candleRed;
+    final bool isCurrency = widget.stock.sector == 'Currencies';
     final bool isForeign =
         widget.stock.sector == 'Crypto' || widget.stock.symbol == 'GOLD';
     final double rate = isForeign ? widget.usdRate : 1.0;
-    final double price = (widget.stock.currentPrice ?? 0.0) * rate;
+    final double price = widget.livePrice ?? ((widget.stock.currentPrice ?? 0.0) * rate);
 
     return Slidable(
       key: Key(widget.stock.symbol),
@@ -138,19 +141,27 @@ class _WatchlistCardState extends State<WatchlistCard>
                   ],
                 ),
               ),
-              // الشارت الصغير
+              // Mini Sparkline
               Expanded(
                 flex: 2,
                 child: SizedBox(
                   height: 30,
-                  child: CustomPaint(
-                    painter: MiniSparklinePainter(
-                      data:
-                          widget.stock.sparklineData ??
-                          [10, 12, 11, 14, 13, 15],
-                      color: trendColor,
-                    ),
-                  ),
+                  child: isCurrency
+                      // Currencies have no sparkline from RPC — show flat line placeholder
+                      ? CustomPaint(
+                          painter: MiniSparklinePainter(
+                            data: [1, 1, 1, 1, 1, 1],
+                            color: Colors.grey.withOpacity(0.4),
+                          ),
+                        )
+                      : CustomPaint(
+                          painter: MiniSparklinePainter(
+                            data:
+                                widget.stock.sparklineData ??
+                                [10, 12, 11, 14, 13, 15],
+                            color: trendColor,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -162,14 +173,24 @@ class _WatchlistCardState extends State<WatchlistCard>
                   children: [
                     FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(
-                        '${price >= 1000 ? price.toStringAsFixed(0) : price.toStringAsFixed(2)} EGP',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          color: context.onSurface,
-                        ),
-                      ),
+                      child: isCurrency && widget.livePrice == null
+                          // Currencies: live price is loaded inside the detail page
+                          ? Text(
+                              '— EGP',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: context.onSurface.withOpacity(0.5),
+                              ),
+                            )
+                          : Text(
+                              '${price >= 1000 ? price.toStringAsFixed(0) : price.toStringAsFixed(2)} EGP',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: context.onSurface,
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -274,7 +295,7 @@ class WatchlistSection extends StatelessWidget {
 
     return Obx(() {
       final usdRate =
-          controller.currencyPrices['USD'] ?? 50.0; // Default fallback
+          controller.currencyPrices['USDEGP'] ?? 51.0; // USD → EGP live rate
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -342,6 +363,9 @@ class WatchlistSection extends StatelessWidget {
                 key: Key(stock.symbol),
                 stock: stock,
                 usdRate: usdRate,
+                livePrice: stock.sector == 'Currencies' 
+                    ? controller.currencyPrices[stock.symbol] 
+                    : null,
                 onTap: () {
                   controller.openStockDetails(stock);
                 },

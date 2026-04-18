@@ -6,23 +6,29 @@ import 'package:flutter/material.dart';
 // Ensure this path matches your actual project structure
 import 'package:egx/features/search/data/models/stock_model.dart';
 import 'package:egx/features/search/domain/entities/stock_entity.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:get/get_navigation/src/extension_navigation.dart';
+import 'package:get/get.dart';
+import 'package:egx/features/home/presentation/controllers/home_controller.dart';
 
 Widget buildListItem(BuildContext context, StockEntity stock) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
 
+  // IMPORTANT: check Currencies BEFORE Crypto — both have candle_table_name == 'API'
+  final isCurrency = stock.sector == 'Currencies';
+  final isCrypto = !isCurrency && stock.candleTableName == 'API';
+
+  double currentPrice = stock.currentPrice ?? stock.prevClose ?? 0.0;
+  if (isCurrency && Get.isRegistered<HomeController>()) {
+    currentPrice = Get.find<HomeController>().currencyPrices[stock.symbol] ?? currentPrice;
+  }
+
   return InkWell(
     onTap: () {
-      final isCrypto = stock.candleTableName == 'API';
-      final isCurrency = stock.sector == 'Currency';
-
       String route;
-      if (isCrypto) {
-        route = AppPages.cryptoDetailsPage;
-      } else if (isCurrency) {
+      if (isCurrency) {
         route = AppPages.currencyDetailsPage;
+      } else if (isCrypto) {
+        route = AppPages.cryptoDetailsPage;
       } else {
         route = AppPages.stockDetailsPage;
       }
@@ -35,9 +41,9 @@ Widget buildListItem(BuildContext context, StockEntity stock) {
           'company_name': stock.companyNameEn ?? stock.companyNameAr,
           'logo_url': stock.logoUrl,
           'sector': stock.sector,
-          'asset_type': isCrypto
-              ? 'crypto'
-              : (isCurrency ? 'currency' : 'stock'),
+          'asset_type': isCurrency
+              ? 'currency'
+              : (isCrypto ? 'crypto' : 'stock'),
           'description': stock.description,
           'total_shares': stock.totalShares,
           'isin_code': stock.isinCode,
@@ -135,12 +141,12 @@ Widget buildListItem(BuildContext context, StockEntity stock) {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if ((stock.currentPrice ?? stock.prevClose ?? 0) > 0) ...[
+                    if (currentPrice > 0) ...[
                       const SizedBox(width: 8),
                       Text(
-                        '${PriceFormatter.formatPrice(stock.currentPrice ?? stock.prevClose ?? 0)} ${stock.sector == 'Indices'
+                        '${PriceFormatter.formatPrice(currentPrice)} ${stock.sector == 'Indices'
                             ? context.s.search_pts
-                            : stock.sector == 'Crypto'
+                            : (stock.sector == 'Crypto')
                             ? context.s.search_currency_usd
                             : context.s.search_egp}',
                         style: theme.textTheme.labelSmall?.copyWith(

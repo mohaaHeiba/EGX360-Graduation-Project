@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'package:egx/core/services/technical_analysis_service.dart';
-import 'package:egx/core/services/technical_result.dart';
 import 'package:egx/core/utils/candle_aggregator.dart';
 import 'package:egx/features/search/data/datasources/search_remote_datasource.dart';
 import 'package:egx/features/search/data/repositories/search_repository_impl.dart';
 import 'package:egx/features/search/domain/repositories/search_repository.dart';
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:egx/features/search/domain/entities/stock_entity.dart';
 import 'package:egx/features/search/domain/entities/candle_entity.dart';
 import 'package:flutter/material.dart';
@@ -34,9 +33,8 @@ class MarketsController extends GetxController with WidgetsBindingObserver {
   var connectionStatus = 'Disconnected'.obs;
   var nextCloseTime = Rxn<DateTime>();
 
-  // Technical analysis — anchored to fixed 15m timeframe
-  var technicalResult = Rxn<TechnicalResult>();
-  var gaugeCandles = <CandleEntity>[].obs; // Dedicated 15m candles for gauge
+  // AI Prediction
+  final aiPrediction = Rxn<AiPrediction>();
 
   bool get isSocketConnected => connectionStatus.value == 'Connected';
   bool get isReconnecting => connectionStatus.value == 'Connecting';
@@ -99,95 +97,6 @@ class MarketsController extends GetxController with WidgetsBindingObserver {
     _loadPopularAssets();
   }
 
-  /// Compute technical analysis score from dedicated 15m gauge candles.
-  void calculateTechnicals() {
-    if (gaugeCandles.isEmpty) {
-      technicalResult.value = TechnicalResult.empty;
-      return;
-    }
-    technicalResult.value = TechnicalAnalysisService.calculateTechnicalScore(
-      gaugeCandles.toList(),
-      isEgx: isEgxStock,
-    );
-  }
-
-  /// Fetch dedicated 15m candle data for the Technical Gauge.
-  /// This is independent from the chart timeframe — the gauge is always
-  /// anchored to 15m to provide a stable "Hawk's Eye" strategic view.
-  Future<void> _fetchGaugeCandles(StockEntity stock) async {
-    try {
-      const gaugeInterval = '15m';
-      const gaugeLimit = 100; // ~25 hours of 15m data — enough for EMA 100
-
-      if (isGoldOrSilver) {
-        // Gold/Silver → Binance
-        final symbol = binanceSymbol;
-        final url =
-            'https://api.binance.com/api/v3/klines?symbol=$symbol&interval=$gaugeInterval&limit=$gaugeLimit';
-        final response = await http.get(Uri.parse(url));
-        if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body);
-          gaugeCandles.value = data.map((item) {
-            return CandleEntity(
-              candleTime: DateTime.fromMillisecondsSinceEpoch(item[0]),
-              open: double.parse(item[1]),
-              high: double.parse(item[2]),
-              low: double.parse(item[3]),
-              close: double.parse(item[4]),
-              volume: double.parse(item[5]).toInt(),
-              timeframe: gaugeInterval,
-            );
-          }).toList();
-        }
-      } else if (stock.candleTableName == 'API' || stock.sector == 'Crypto') {
-        // Crypto → Binance
-        final symbol = '${stock.symbol.toUpperCase()}USDT';
-        final url =
-            'https://api.binance.com/api/v3/klines?symbol=$symbol&interval=$gaugeInterval&limit=$gaugeLimit';
-        final response = await http.get(Uri.parse(url));
-        if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body);
-          gaugeCandles.value = data.map((item) {
-            return CandleEntity(
-              candleTime: DateTime.fromMillisecondsSinceEpoch(item[0]),
-              open: double.parse(item[1]),
-              high: double.parse(item[2]),
-              low: double.parse(item[3]),
-              close: double.parse(item[4]),
-              volume: double.parse(item[5]).toInt(),
-              timeframe: gaugeInterval,
-            );
-          }).toList();
-        }
-      } else {
-        // EGX → Supabase (fetch 1m data, aggregate to 15m)
-        final data = await searchRepository.getStockCandles(
-          stock.symbol,
-          candleTableName: stock.candleTableName,
-          limit: 1500, // ~1500 × 1m ≈ 100 × 15m candles
-          resolution: '1m',
-        );
-        if (data.isNotEmpty) {
-          data.sort((a, b) => a.candleTime.compareTo(b.candleTime));
-          var aggregated = CandleAggregator.aggregate(data, 15);
-          aggregated = _alignCandlesToInterval(aggregated, gaugeInterval);
-          // Deduplicate
-          final Map<String, CandleEntity> unique = {};
-          for (var c in aggregated) {
-            unique[c.candleTime.toIso8601String()] = c;
-          }
-          gaugeCandles.value = unique.values.toList()
-            ..sort((a, b) => a.candleTime.compareTo(b.candleTime));
-        }
-      }
-
-      calculateTechnicals();
-    } catch (e) {
-      print('Gauge candle fetch error: $e');
-      technicalResult.value = TechnicalResult.empty;
-    }
-  }
-
   Future<void> _loadDefaultStock() async {
     // Create a default BTC stock entity
     final btcStock = StockEntity(
@@ -200,8 +109,9 @@ class MarketsController extends GetxController with WidgetsBindingObserver {
       logoUrl: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png',
     );
     selectedStock.value = btcStock;
-    await fetchCandles(btcStock, interval: '1m');
-    _fetchGaugeCandles(btcStock); // Dedicated 15m fetch for gauge
+    fetchCandles(btcStock);
+    fetchDailyCandle(btcStock);
+    fetchAiPrediction(btcStock.symbol);
   }
 
   Future<void> _loadPopularAssets() async {
@@ -260,7 +170,7 @@ class MarketsController extends GetxController with WidgetsBindingObserver {
     searchResults.clear();
     fetchCandles(stock, interval: selectedInterval.value);
     fetchDailyCandle(stock); // Fetch daily session data
-    _fetchGaugeCandles(stock); // Dedicated 15m fetch for gauge
+    fetchAiPrediction(stock.symbol);
   }
 
   Future<void> fetchCandles(StockEntity stock, {String interval = '1m'}) async {
@@ -296,6 +206,17 @@ class MarketsController extends GetxController with WidgetsBindingObserver {
       connectionStatus.value = 'Error';
     } finally {
       isLoadingCandles.value = false;
+    }
+  }
+
+  Future<void> fetchAiPrediction(String symbol) async {
+    try {
+      final prediction = await searchRepository.getLatestAiPrediction(symbol);
+      aiPrediction.value = prediction;
+      print('AI Prediction for $symbol: ${prediction?.probability}');
+    } catch (e) {
+      print('Error fetching AI prediction: $e');
+      aiPrediction.value = null;
     }
   }
 

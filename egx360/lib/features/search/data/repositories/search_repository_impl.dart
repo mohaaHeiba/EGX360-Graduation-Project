@@ -1,3 +1,4 @@
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:egx/features/search/data/datasources/search_remote_datasource.dart';
 import 'package:egx/features/search/domain/entities/candle_entity.dart';
 import 'package:egx/features/search/domain/entities/news_entity.dart';
@@ -102,5 +103,10 @@ class SearchRepositoryImpl implements SearchRepository {
   @override
   Future<StockEntity> getStockBySymbol(String symbol) async {
     return await remoteDataSource.getStockBySymbol(symbol);
+  }
+
+  @override
+  Future<AiPrediction?> getLatestAiPrediction(String symbol) async {
+    return await remoteDataSource.getLatestAiPrediction(symbol);
   }
 }

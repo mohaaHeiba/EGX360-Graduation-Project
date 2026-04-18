@@ -2,6 +2,7 @@ import 'package:egx/features/search/domain/entities/candle_entity.dart';
 import 'package:egx/features/search/domain/entities/news_entity.dart';
 import 'package:egx/features/assets/data/datasources/crypto_remote_data_source.dart';
 import 'package:egx/features/assets/data/datasources/stock_remote_data_source.dart';
+import 'package:egx/features/assets/data/datasources/currency_remote_data_source.dart';
 import 'package:egx/features/assets/domain/repositories/asset_repository.dart';
 import 'package:egx/features/home/domain/entities/material_price_entity.dart';
 import 'package:egx/features/assets/domain/entities/asset_type.dart';
@@ -9,10 +10,12 @@ import 'package:egx/features/assets/domain/entities/asset_type.dart';
 class AssetRepositoryImpl implements AssetRepository {
   final CryptoRemoteDataSource cryptoRemoteDataSource;
   final StockRemoteDataSource stockRemoteDataSource;
+  final CurrencyRemoteDataSource currencyRemoteDataSource;
 
   AssetRepositoryImpl({
     required this.cryptoRemoteDataSource,
     required this.stockRemoteDataSource,
+    required this.currencyRemoteDataSource,
   });
 
   @override
@@ -26,7 +29,6 @@ class AssetRepositoryImpl implements AssetRepository {
   }) async {
     switch (assetType) {
       case AssetType.crypto:
-        // Use crypto data source (Binance)
         return await cryptoRemoteDataSource.fetchHistoricalData(
           symbol: symbol,
           interval: interval,
@@ -36,8 +38,8 @@ class AssetRepositoryImpl implements AssetRepository {
       case AssetType.stock:
       case AssetType.marketIndex:
       case AssetType.material:
-        // Use stock data source (Supabase or Binance for materials)
-        // The stock repository already handles hybrid logic for Gold/Silver
+      case AssetType.currency:
+        // Currency candle data is fetched via getCurrencyHistory directly
         return await stockRemoteDataSource.fetchStockCandles(
           tableName: tableName ?? 'egx30_candles',
           interval: interval,
@@ -49,7 +51,6 @@ class AssetRepositoryImpl implements AssetRepository {
 
   @override
   Future<Map<String, dynamic>> getAsset24hrTicker(String symbol) async {
-    // Only applicable for crypto assets
     return await cryptoRemoteDataSource.fetch24hrTicker(symbol);
   }
 
@@ -69,5 +70,15 @@ class AssetRepositoryImpl implements AssetRepository {
   @override
   Future<MaterialPriceEntity> getMaterialPrice() async {
     return await stockRemoteDataSource.fetchMaterialPrice();
+  }
+
+  @override
+  Future<Map<String, double>> getCurrencyLivePrices() async {
+    return await currencyRemoteDataSource.getLivePrices();
+  }
+
+  @override
+  Future<List<CandleEntity>> getCurrencyHistory(String symbol, int days) async {
+    return await currencyRemoteDataSource.getHistory(symbol, days);
   }
 }

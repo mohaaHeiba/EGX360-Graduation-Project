@@ -239,6 +239,23 @@ class SearchStocksController extends GetxController {
       } finally {
         isLoading.value = false;
       }
+    } else if (selectedCategory.value == 'Currencies') {
+      // Currencies: Fetch ALL (no pagination, fixed list of 10)
+      isLoading.value = true;
+      try {
+        final stocks = await getInitialStocksUseCase(
+          category: selectedCategory.value,
+          limit: 10,
+        );
+
+        if (searchController.text.isEmpty) {
+          initialPicks.value = stocks;
+        }
+      } catch (e) {
+        print('Fetch Error: $e');
+      } finally {
+        isLoading.value = false;
+      }
     } else {
       // Default behavior for other categories (e.g., All, Gold) - just fetch top 5
       isLoading.value = true;

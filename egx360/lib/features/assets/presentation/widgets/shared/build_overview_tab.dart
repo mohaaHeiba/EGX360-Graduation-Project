@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'package:egx/core/constants/app_gaps.dart';
 import 'package:egx/core/helper/context_extensions.dart';
-import 'package:egx/core/services/technical_result.dart';
 import 'package:egx/core/utils/price_formatter.dart';
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:egx/features/markets/presentation/widgets/desktop/technical_gauge.dart';
 import 'package:egx/features/search/domain/entities/candle_entity.dart';
 import 'package:flutter/material.dart';
@@ -26,7 +26,7 @@ Widget buildOverviewTab(
   bool isEgp = true,
   bool isCurrency = false,
   double rate = 1.0,
-  TechnicalResult? technicalResult,
+  AiPrediction? aiPrediction,
 }) {
   // --- Calculations ---
   String open = "-";
@@ -131,9 +131,13 @@ Widget buildOverviewTab(
   String description = stockData['description'] ?? "No description available.";
   List<String> constituents = [];
 
-  if (isIndex && description.contains('--split--')) {
+  if (isIndex && description.isNotEmpty && description.contains('--split--')) {
     final parts = description.split('--split--');
+
+    // الجزء الأول: بنحدث قيمة الـ description بالجزء اللي قبل split
     description = parts[0].trim();
+
+    // الجزء الثاني: شغلك القديم زي ما هو بدون أي تغيير
     if (parts.length > 1) {
       constituents = parts[1].split(',').map((e) => e.trim()).toList();
     }
@@ -143,10 +147,10 @@ Widget buildOverviewTab(
     builder: (context) {
       final isDarkMode = context.isDarkMode;
 
-      final localizedDescription =
-          stockData['description'] ??
-          S.of(context).asset_details_no_description;
-
+      final localizedDescription = description.isNotEmpty
+          ? description
+          : (stockData['description'] ??
+                S.of(context).asset_details_no_description);
       // Build stat cards list with subsections
       final List<Widget> allContent = [];
 
@@ -264,13 +268,14 @@ Widget buildOverviewTab(
           ),
         );
 
-        // Technical Gauge — 15m anchored analysis
-        if (technicalResult != null) {
+        // AI Prediction Gauge
+        if (aiPrediction != null) {
           allContent.add(const SizedBox(height: 20));
           allContent.add(
             TechnicalGauge(
-              value: technicalResult.score,
-              result: technicalResult,
+              value: aiPrediction.score,
+              isAi: true,
+              customRecommendation: 'AI: ${aiPrediction.recommendation}',
               display: false,
             ),
           );
@@ -314,57 +319,137 @@ Widget buildOverviewTab(
             ),
             const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(20),
+              // padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: context.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: context.onSurface.withOpacity(0.05)),
+                color: isDarkMode
+                    ? context.surface.withOpacity(0.5)
+                    : context.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: context.onSurface.withOpacity(0.1)),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
+                  // Table Header
+                  Container(
+                    color: context.onSurface.withOpacity(0.03),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            S
+                                .of(context)
+                                .asset_details_key_stats, // Or a specific "Type" localization if available
+                            style: context.textStyles.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: context.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            S.of(context).order_buy,
+                            textAlign: TextAlign.right,
+                            style: context.textStyles.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: context.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            S.of(context).order_sell,
+                            textAlign: TextAlign.right,
+                            style: context.textStyles.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: context.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(
+                    color: context.onSurface.withOpacity(0.05),
+                    height: 1,
+                  ),
+
+                  // Table Rows
                   if (symbol == 'GOLD') ...[
-                    _buildDetailRow(
+                    _buildPriceTableRow(
                       S.of(context).asset_details_gold_24k,
-                      "${materialPrice.price24k.toStringAsFixed(2)} ${S.of(context).asset_details_egp}",
-                      Icons.monetization_on,
+                      materialPrice.p24Buy,
+                      materialPrice.p24Sell,
                       context,
                     ),
-                    Divider(
-                      color: context.onSurface.withOpacity(0.1),
-                      height: 32,
-                    ),
-                    _buildDetailRow(
+                    _buildPriceTableRow(
                       S.of(context).asset_details_gold_21k,
-                      "${materialPrice.price21k.toStringAsFixed(2)} ${S.of(context).asset_details_egp}",
-                      Icons.stars,
+                      materialPrice.p21Buy,
+                      materialPrice.p21Sell,
                       context,
+                      isAltRow: true,
                     ),
-                    Divider(
-                      color: context.onSurface.withOpacity(0.1),
-                      height: 32,
-                    ),
-                    _buildDetailRow(
+                    _buildPriceTableRow(
                       S.of(context).asset_details_gold_18k,
-                      "${materialPrice.price18k.toStringAsFixed(2)} ${S.of(context).asset_details_egp}",
-                      Icons.local_offer,
+                      materialPrice.p18Buy,
+                      materialPrice.p18Sell,
                       context,
+                    ),
+                    _buildPriceTableRow(
+                      S.of(context).asset_details_gold_ounce,
+                      materialPrice.ounceBuy,
+                      materialPrice.ounceSell,
+                      context,
+                      isAltRow: true,
+                    ),
+                    _buildPriceTableRow(
+                      S.of(context).asset_details_gold_pound,
+                      materialPrice.goldPoundBuy,
+                      materialPrice.goldPoundSell,
+                      context,
+                    ),
+                    _buildPriceTableRow(
+                      S.of(context).asset_details_gold_bar_50g,
+                      materialPrice.bar50gBuy,
+                      materialPrice.bar50gSell,
+                      context,
+                      isAltRow: true,
+                    ),
+                    _buildPriceTableRow(
+                      S.of(context).asset_details_gold_bar_100g,
+                      materialPrice.bar100gBuy,
+                      materialPrice.bar100gSell,
+                      context,
+                    ),
+                    _buildPriceTableRow(
+                      S.of(context).asset_details_gold_bar_250g,
+                      materialPrice.bar250gBuy,
+                      materialPrice.bar250gSell,
+                      context,
+                      isAltRow: true,
+                      isLast: true,
                     ),
                   ] else if (symbol == 'SILVER') ...[
-                    _buildDetailRow(
+                    _buildPriceTableRow(
                       S.of(context).asset_details_silver_999,
-                      "${materialPrice.silver999.toStringAsFixed(2)} ${S.of(context).asset_details_egp}",
-                      Icons.blur_on,
+                      materialPrice.silver999Buy,
+                      materialPrice.silver999Sell,
                       context,
                     ),
-                    Divider(
-                      color: context.onSurface.withOpacity(0.1),
-                      height: 32,
-                    ),
-                    _buildDetailRow(
-                      S.of(context).asset_details_silver_800,
-                      "${materialPrice.silver800.toStringAsFixed(2)} ${S.of(context).asset_details_egp}",
-                      Icons.blur_linear,
+                    _buildPriceTableRow(
+                      S.of(context).asset_details_silver_925,
+                      materialPrice.silver925Buy,
+                      materialPrice.silver925Sell,
                       context,
+                      isAltRow: true,
+                      isLast: true,
                     ),
                   ],
                 ],
@@ -372,7 +457,7 @@ Widget buildOverviewTab(
             ),
           ],
           const SizedBox(height: 32),
-          if (!isIndex && !isCurrency) ...[
+          if (!isIndex) ...[
             _buildSectionTitle(
               S.of(context).asset_details_company_profile,
               context,
@@ -622,3 +707,72 @@ Widget _buildDetailRow(
 }
 
 /// Helper function to determine RSI color based on value
+
+Widget _buildPriceTableRow(
+  String title,
+  double buyPrice,
+  double sellPrice,
+  BuildContext context, {
+  bool isAltRow = false,
+  bool isLast = false,
+}) {
+  return Column(
+    children: [
+      Container(
+        color: isAltRow
+            ? context.onSurface.withOpacity(0.01)
+            : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            // Title
+            Expanded(
+              flex: 2,
+              child: Text(
+                title,
+                style: context.textStyles.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+            // Buy Price (Greenish)
+            Expanded(
+              flex: 3,
+              child: Text(
+                PriceFormatter.formatPrice(buyPrice),
+                textAlign: TextAlign.right,
+                style: context.textStyles.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[600],
+                  fontFamily: 'monospace',
+                  fontSize: 14.5,
+                ),
+              ),
+            ),
+
+            // Sell Price (Reddish)
+            Expanded(
+              flex: 3,
+              child: Text(
+                PriceFormatter.formatPrice(sellPrice),
+                textAlign: TextAlign.right,
+                style: context.textStyles.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red[500],
+                  fontFamily: 'monospace',
+                  fontSize: 14.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (!isLast)
+        Divider(color: context.onSurface.withOpacity(0.05), height: 1),
+    ],
+  );
+}

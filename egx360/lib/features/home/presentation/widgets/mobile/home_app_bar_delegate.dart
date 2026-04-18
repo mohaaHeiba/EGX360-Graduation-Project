@@ -62,12 +62,41 @@ class HomeIdentityHeader extends SliverPersistentHeaderDelegate {
             child: const EGXLogoStackLoop(),
           ),
 
-          Positioned(
-            right: 0,
-            bottom: 18,
-            child: _buildNotificationButton(context),
-          ),
+          Positioned(right: 0, bottom: 18, child: _buildActionButtons(context)),
         ],
+      ),
+    );
+  }
+
+  /// Row with chatbot button + notification button.
+  Widget _buildActionButtons(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildChatbotButton(context),
+        const SizedBox(width: 8),
+        _buildNotificationButton(context),
+      ],
+    );
+  }
+
+  Widget _buildChatbotButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Get.toNamed(AppPages.chatbotPage),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: context.surface.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: context.onSurface.withOpacity(0.1)),
+        ),
+
+        child: Icon(
+          Icons.smart_toy_rounded,
+          color: context.onSurface,
+          size: 20,
+        ),
       ),
     );
   }

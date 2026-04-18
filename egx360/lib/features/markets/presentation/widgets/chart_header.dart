@@ -17,6 +17,7 @@ class ChartHeader extends StatelessWidget {
   final Function(String) onTimeframeSelected;
   final MarketsController controller;
   final VoidCallback? onToggleSidebar;
+  final VoidCallback? onShowDetails;
   final bool enableSearch;
 
   const ChartHeader({
@@ -31,6 +32,7 @@ class ChartHeader extends StatelessWidget {
     required this.onTimeframeSelected,
     required this.controller,
     this.onToggleSidebar,
+    this.onShowDetails,
     this.enableSearch = true,
   });
 
@@ -178,6 +180,16 @@ class ChartHeader extends StatelessWidget {
               ),
             ],
           ),
+          if (onShowDetails != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: IconButton(
+                icon: const Icon(LucideIcons.info),
+                onPressed: onShowDetails,
+                tooltip: 'Show Details',
+                color: context.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
           if (onToggleSidebar != null)
             Padding(
               padding: const EdgeInsets.only(left: 16),

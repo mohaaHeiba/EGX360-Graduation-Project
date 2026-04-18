@@ -23,9 +23,8 @@ import 'package:egx/features/profile/presentations/page/followers_following_page
 import 'package:egx/features/profile/presentations/page/saved_posts_page.dart';
 import 'package:egx/features/search/presentation/pages/news_details_page.dart';
 import 'package:egx/features/search/presentation/pages/all_news_page.dart';
-import 'package:egx/features/currency/presentation/bindings/currency_bindings.dart';
-import 'package:egx/features/currency/presentation/pages/currency_details_page.dart';
 import 'package:egx/features/assets/presentation/pages/asset_details_page.dart';
+
 import 'package:egx/features/news_briefing/presentation/pages/news_summary_page.dart';
 import 'package:egx/features/assets/presentation/bindings/asset_bindings.dart';
 import 'package:egx/features/welcome/presentaion/page/welcome_page.dart';
@@ -35,12 +34,15 @@ import 'package:egx/core/Layout/side_nav_bar.dart';
 import 'package:egx/core/utils/responsive_transition.dart';
 import 'package:egx/features/news_briefing/presentation/bindings/news_briefing_bindings.dart';
 import 'package:egx/features/notifications/presentation/page/notification_page.dart';
+import 'package:egx/features/chatbot/presentation/pages/chatbot_page.dart';
 import 'package:egx/features/notifications/presentation/bindings/notification_binding.dart';
 import 'package:egx/features/simulation/presentation/pages/portfolio_page.dart';
 import 'package:egx/features/simulation/presentation/pages/transaction_history_page.dart';
 import 'package:egx/features/simulation/presentation/bindings/simulation_bindings.dart';
+import 'package:egx/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:egx/features/onboarding/presentation/bindings/onboarding_bindings.dart';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:egx/features/home/presentation/pages/watchlist_page.dart';
@@ -75,8 +77,18 @@ class AppPages {
   static const newsSummaryPage = '/newsSummaryPage';
   static const cryptoDetailsPage = '/cryptoDetailsPage';
   static const currencyDetailsPage = '/currencyDetailsPage';
+  static const chatbotPage = '/chatbot';
+  static const onboardingPage = '/onboarding';
 
   static List<GetPage> routes = [
+    // Onboarding (shown once after first registration)
+    GetPage(
+      name: onboardingPage,
+      page: () => const OnboardingPage(),
+      binding: OnboardingBindings(),
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 500),
+    ),
     // welcome
     GetPage(
       name: welcomePage,
@@ -209,8 +221,8 @@ class AppPages {
     ),
     GetPage(
       name: currencyDetailsPage,
-      page: () => const DesktopRouteWrapper(child: CurrencyDetailsPage()),
-      binding: CurrencyBindings(),
+      page: () => const DesktopRouteWrapper(child: AssetDetailsPage()),
+      binding: AssetBindings(),
       customTransition: ResponsiveTransition.adaptive(
         mobileTransition: Transition.downToUp,
       ),
@@ -267,6 +279,23 @@ class AppPages {
       binding: SimulationBindings(),
       customTransition: ResponsiveTransition.adaptive(
         mobileTransition: Transition.rightToLeft,
+      ),
+    ),
+    GetPage(
+      name: chatbotPage,
+      page: () => ResponsiveLayout(
+        mobileBody: const ChatbotPage(),
+        desktopBody: Scaffold(
+          body: Row(
+            children: [
+              const SideNavBar(),
+              const Expanded(child: ChatbotPage(isDesktop: true)),
+            ],
+          ),
+        ),
+      ),
+      customTransition: ResponsiveTransition.adaptive(
+        mobileTransition: Transition.downToUp,
       ),
     ),
   ];

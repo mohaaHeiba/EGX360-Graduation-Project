@@ -5,6 +5,7 @@ import 'package:egx/core/utils/price_formatter.dart';
 import 'package:egx/features/search/domain/entities/stock_entity.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:egx/features/home/presentation/controllers/home_controller.dart';
 
 class SearchStockCardDesktop extends StatefulWidget {
   final StockEntity stock;
@@ -23,12 +24,19 @@ class _SearchStockCardDesktopState extends State<SearchStockCardDesktop> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isCrypto = widget.stock.candleTableName == 'API';
-    final isCurrency = widget.stock.sector == 'Currency';
+    // IMPORTANT: check Currencies BEFORE Crypto — both have candle_table_name == 'API'
+    final isCurrency = widget.stock.sector == 'Currencies';
+    final isCrypto = !isCurrency && widget.stock.candleTableName == 'API';
 
     // Calculate change (if available, otherwise 0)
-    final currentPrice =
+    double currentPrice =
         widget.stock.currentPrice ?? widget.stock.prevClose ?? 0.0;
+        
+    if (isCurrency && Get.isRegistered<HomeController>()) {
+      final homeCtrl = Get.find<HomeController>();
+      currentPrice = homeCtrl.currencyPrices[widget.stock.symbol] ?? currentPrice;
+    }
+
     final prevClose = widget.stock.prevClose ?? 0.0;
     final change = prevClose != 0 ? currentPrice - prevClose : 0.0;
     final changePercent = prevClose != 0 ? (change / prevClose) * 100 : 0.0;
@@ -179,38 +187,39 @@ class _SearchStockCardDesktopState extends State<SearchStockCardDesktop> {
               // Bottom: Change & Sector
               Row(
                 children: [
-                  // Change Tag
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (isPositive ? Colors.green : Colors.red)
-                          .withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPositive
-                              ? Icons.arrow_upward_rounded
-                              : Icons.arrow_downward_rounded,
-                          color: isPositive ? Colors.green : Colors.red,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${changePercent.abs().toStringAsFixed(2)}%',
-                          style: theme.textTheme.labelSmall?.copyWith(
+                  if (!isCurrency)
+                    // Change Tag
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: (isPositive ? Colors.green : Colors.red)
+                            .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isPositive
+                                ? Icons.arrow_upward_rounded
+                                : Icons.arrow_downward_rounded,
                             color: isPositive ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold,
+                            size: 14,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            '${changePercent.abs().toStringAsFixed(2)}%',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: isPositive ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
                   const Spacer(),
 

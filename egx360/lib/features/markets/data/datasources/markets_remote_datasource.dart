@@ -1,3 +1,4 @@
+import 'package:egx/features/markets/data/models/ai_prediction_model.dart';
 import 'package:egx/features/search/data/datasources/search_remote_datasource.dart';
 import 'package:egx/features/search/data/models/stock_model.dart';
 import 'package:egx/features/search/data/models/candle_model.dart';
@@ -21,6 +22,8 @@ abstract class MarketsRemoteDataSource {
     required DateTime before,
     int? limit,
   });
+
+  Future<AiPredictionModel?> getLatestAiPrediction(String symbol);
 }
 
 class MarketsRemoteDataSourceImpl implements MarketsRemoteDataSource {
@@ -89,6 +92,11 @@ class MarketsRemoteDataSourceImpl implements MarketsRemoteDataSource {
     } else {
       throw Exception('Failed to load more candles: ${response.statusCode}');
     }
+  }
+
+  @override
+  Future<AiPredictionModel?> getLatestAiPrediction(String symbol) async {
+    return await searchDataSource.getLatestAiPrediction(symbol);
   }
 
   /// Map UI interval to Binance API interval format

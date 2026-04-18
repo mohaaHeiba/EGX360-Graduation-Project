@@ -1,3 +1,4 @@
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:egx/features/search/domain/entities/candle_entity.dart';
 import 'package:egx/features/search/domain/entities/news_entity.dart';
 import 'package:egx/features/search/domain/entities/stock_entity.dart';
@@ -33,4 +34,5 @@ abstract class SearchRepository {
   Future<bool> isStockInWatchlist(String userId, String symbol);
   Future<MaterialPriceEntity?> getLatestMaterialPrice();
   Future<StockEntity> getStockBySymbol(String symbol);
+  Future<AiPrediction?> getLatestAiPrediction(String symbol);
 }

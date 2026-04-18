@@ -1,4 +1,4 @@
-enum AssetType { stock, crypto, material, marketIndex }
+enum AssetType { stock, crypto, material, marketIndex, currency }
 
 extension AssetTypeExtension on AssetType {
   String get displayName {
@@ -11,6 +11,8 @@ extension AssetTypeExtension on AssetType {
         return 'Material';
       case AssetType.marketIndex:
         return 'Index';
+      case AssetType.currency:
+        return 'Currency';
     }
   }
 
@@ -18,4 +20,5 @@ extension AssetTypeExtension on AssetType {
   bool get isStock => this == AssetType.stock;
   bool get isMaterial => this == AssetType.material;
   bool get isMarketIndex => this == AssetType.marketIndex;
+  bool get isCurrency => this == AssetType.currency;
 }

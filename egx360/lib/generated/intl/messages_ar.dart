@@ -221,6 +221,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "asset_details_gold_24k": MessageLookupByLibrary.simpleMessage(
       "ذهب عيار 24",
     ),
+    "asset_details_gold_bar_100g": MessageLookupByLibrary.simpleMessage(
+      "سبيكة ذهب 100 جرام",
+    ),
+    "asset_details_gold_bar_250g": MessageLookupByLibrary.simpleMessage(
+      "سبيكة ذهب 250 جرام",
+    ),
+    "asset_details_gold_bar_50g": MessageLookupByLibrary.simpleMessage(
+      "سبيكة ذهب 50 جرام",
+    ),
+    "asset_details_gold_ounce": MessageLookupByLibrary.simpleMessage(
+      "أوقية الذهب",
+    ),
+    "asset_details_gold_pound": MessageLookupByLibrary.simpleMessage(
+      "الجنيه الذهب",
+    ),
     "asset_details_high": MessageLookupByLibrary.simpleMessage("أعلى سعر"),
     "asset_details_index_label": MessageLookupByLibrary.simpleMessage(
       "EGX • مؤشر",
@@ -289,8 +304,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "asset_details_read_full": MessageLookupByLibrary.simpleMessage(
       "قراءة المقال كاملاً",
     ),
-    "asset_details_silver_800": MessageLookupByLibrary.simpleMessage(
-      "فضة عيار 800",
+    "asset_details_silver_925": MessageLookupByLibrary.simpleMessage(
+      "فضة عيار 925",
     ),
     "asset_details_silver_999": MessageLookupByLibrary.simpleMessage(
       "فضة عيار 999",

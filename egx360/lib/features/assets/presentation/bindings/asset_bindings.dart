@@ -1,9 +1,13 @@
 import 'package:egx/core/data/init_local_data.dart';
 import 'package:egx/core/services/cerebras_ai_service.dart';
 import 'package:egx/features/assets/data/datasources/crypto_remote_data_source.dart';
+import 'package:egx/features/assets/data/datasources/currency_remote_data_source.dart';
 import 'package:egx/features/assets/data/datasources/stock_remote_data_source.dart';
+import 'package:egx/features/assets/data/repositories/asset_repository_impl.dart';
 import 'package:egx/features/assets/data/repositories/stock_repository_impl.dart';
 import 'package:egx/features/assets/domain/entities/asset_type.dart';
+import 'package:egx/features/assets/domain/usecases/get_currency_history_usecase.dart';
+import 'package:egx/features/assets/domain/usecases/get_currency_live_prices_usecase.dart';
 import 'package:egx/features/assets/domain/usecases/get_material_price_usecase.dart';
 import 'package:egx/features/assets/domain/usecases/get_stock_candles_usecase.dart';
 import 'package:egx/features/assets/domain/usecases/get_stock_news_usecase.dart';
@@ -27,6 +31,7 @@ import 'package:egx/features/search/domain/usecases/get_latest_news_usecase.dart
 import 'package:egx/features/search/domain/usecases/get_watchlist_status_usecase.dart';
 import 'package:egx/features/search/domain/usecases/toggle_watchlist_usecase.dart'
     as watchlist;
+import 'package:egx/features/search/domain/usecases/get_latest_ai_prediction_usecase.dart';
 import 'package:egx/features/stock_chat/data/datasources/stock_chat_remote_datasource.dart';
 import 'package:egx/features/stock_chat/data/repositories/stock_chat_repository_impl.dart';
 import 'package:egx/features/stock_chat/domian/usecases/get_chat_stream_usecase.dart';
@@ -54,10 +59,14 @@ class AssetBindings extends Bindings {
         assetType = AssetType.material;
       } else if (typeStr == 'index') {
         assetType = AssetType.marketIndex;
+      } else if (typeStr == 'currency') {
+        assetType = AssetType.currency;
       }
     } else {
-      // Infer from symbol or sector
-      if (symbol.toUpperCase().contains('GOLD')) {
+      // Infer from sector — check Currencies FIRST (they also have candle_table_name == 'API')
+      if (args['sector'] == 'Currencies') {
+        assetType = AssetType.currency;
+      } else if (symbol.toUpperCase().contains('GOLD')) {
         symbol = 'GOLD';
         assetType = AssetType.material;
       } else if (symbol.toUpperCase().contains('SILVER')) {
@@ -82,6 +91,9 @@ class AssetBindings extends Bindings {
     final cryptoRemoteDataSource = CryptoRemoteDataSourceImpl(
       client: httpClient,
     );
+    final currencyRemoteDataSource = CurrencyRemoteDataSourceImpl(
+      client: httpClient,
+    );
     final searchRemoteDataSource = SearchRemoteDataSourceImpl(supabase);
     final communityRemoteDataSource = CommunityRemoteDataSourceImpl(supabase);
     final profileRemoteDataSource = ProfileRemoteDataSourceImpl(supabase);
@@ -90,7 +102,15 @@ class AssetBindings extends Bindings {
       cerebrasService: cerebrasAiService,
     );
 
+    // Unified asset repository (wraps all datasources)
+    final assetRepository = AssetRepositoryImpl(
+      cryptoRemoteDataSource: cryptoRemoteDataSource,
+      stockRemoteDataSource: stockRemoteDataSource,
+      currencyRemoteDataSource: currencyRemoteDataSource,
+    );
+
     // Repositories
+
     final stockRepository = StockRepositoryImpl(
       remoteDataSource: stockRemoteDataSource,
     );
@@ -122,6 +142,14 @@ class AssetBindings extends Bindings {
     final getCryptoCandlesUseCase = GetCryptoCandlesUseCase(cryptoRepository);
     final getCryptoTickerUseCase = GetCryptoTickerUseCase(cryptoRepository);
 
+    // Use Cases - Currency specific
+    final getCurrencyHistoryUseCase = GetCurrencyHistoryUseCase(
+      assetRepository,
+    );
+    final getCurrencyLivePricesUseCase = GetCurrencyLivePricesUseCase(
+      assetRepository,
+    );
+
     // Use Cases - Shared
     final getAllPostsUseCase = GetAllPostsUseCase(communityRepository);
     final togglePostVoteUseCase = TogglePostVoteUseCase(profileRepository);
@@ -133,6 +161,9 @@ class AssetBindings extends Bindings {
       searchRepository,
     );
     final summarizeNewsUseCase = SummarizeNewsUseCase(newsBriefingRepository);
+    final getLatestAiPredictionUseCase = GetLatestAiPredictionUseCase(
+      searchRepository,
+    );
 
     // Put use cases in Get for other controllers to find
     Get.put(toggleWatchlistUseCase);
@@ -148,8 +179,10 @@ class AssetBindings extends Bindings {
         symbol: symbol,
         assetType: assetType,
         // Only pass use cases that are relevant for this asset type
-        getStockNewsUseCase: assetType.isCrypto ? null : getStockNewsUseCase,
-        getStockCandlesUseCase: assetType.isCrypto
+        getStockNewsUseCase: (assetType.isCrypto || assetType.isCurrency)
+            ? null
+            : getStockNewsUseCase,
+        getStockCandlesUseCase: (assetType.isCrypto || assetType.isCurrency)
             ? null
             : getStockCandlesUseCase,
         getCryptoCandlesUseCase: assetType.isCrypto
@@ -157,6 +190,12 @@ class AssetBindings extends Bindings {
             : null,
         getCryptoTickerUseCase: assetType.isCrypto
             ? getCryptoTickerUseCase
+            : null,
+        getCurrencyHistoryUseCase: assetType.isCurrency
+            ? getCurrencyHistoryUseCase
+            : null,
+        getCurrencyLivePricesUseCase: assetType.isCurrency
+            ? getCurrencyLivePricesUseCase
             : null,
         getMaterialPriceUseCase: getMaterialPriceUseCase,
         getAllPostsUseCase: getAllPostsUseCase,
@@ -166,6 +205,7 @@ class AssetBindings extends Bindings {
         getWatchlistStatusUseCase: getWatchlistStatusUseCase,
         getLatestNewsUseCase: getLatestNewsUseCase,
         summarizeNewsUseCase: summarizeNewsUseCase,
+        getLatestAiPredictionUseCase: getLatestAiPredictionUseCase,
       ),
     );
   }

@@ -17,8 +17,9 @@ class StockSearchItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCrypto = stock.candleTableName == 'API';
-    final isCurrency = stock.sector == 'Currency';
+    // IMPORTANT: check Currencies BEFORE Crypto — both have candle_table_name == 'API'
+    final isCurrency = stock.sector == 'Currencies';
+    final isCrypto = !isCurrency && stock.candleTableName == 'API';
     final currencySymbol = isCrypto ? '\$' : (isCurrency ? '' : 'EGP');
 
     return InkWell(

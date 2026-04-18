@@ -19,6 +19,7 @@ class SearchPageMobile extends GetView<SearchStocksController> {
       context.s.search_cat_indices,
       context.s.search_cat_crypto,
       context.s.search_cat_materials,
+      'Currencies', // Uses Supabase sector == 'Currencies'
     ];
 
     return Scaffold(

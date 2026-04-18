@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:egx/core/constants/app_colors.dart';
 import 'package:egx/core/routes/app_pages.dart';
-import 'package:egx/core/services/technical_analysis_service.dart';
-import 'package:egx/core/services/technical_result.dart';
 import 'package:egx/core/utils/candle_aggregator.dart';
 import 'package:egx/features/assets/domain/entities/asset_type.dart';
 import 'package:egx/features/assets/domain/usecases/get_stock_candles_usecase.dart';
@@ -11,6 +9,8 @@ import 'package:egx/features/assets/domain/usecases/get_stock_news_usecase.dart'
 import 'package:egx/features/assets/domain/usecases/get_material_price_usecase.dart';
 import 'package:egx/features/assets/domain/usecases/get_crypto_candles_usecase.dart';
 import 'package:egx/features/assets/domain/usecases/get_crypto_ticker_usecase.dart';
+import 'package:egx/features/assets/domain/usecases/get_currency_history_usecase.dart';
+import 'package:egx/features/assets/domain/usecases/get_currency_live_prices_usecase.dart';
 import 'package:egx/features/community/domain/usecase/get_all_posts_usecase.dart';
 import 'package:egx/features/home/domain/entities/material_price_entity.dart';
 import 'package:egx/features/news_briefing/domain/entities/news_summary_entity.dart';
@@ -23,12 +23,13 @@ import 'package:egx/features/search/domain/usecases/get_latest_news_usecase.dart
 import 'package:egx/features/search/domain/usecases/get_watchlist_status_usecase.dart';
 import 'package:egx/features/search/domain/usecases/toggle_watchlist_usecase.dart'
     as watchlist;
+import 'package:egx/features/search/domain/usecases/get_latest_ai_prediction_usecase.dart';
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:egx/generated/l10n.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:http/http.dart' as http;
 
 /// Unified controller for all asset types (stocks, crypto, materials, indices)
 class AssetDetailsController extends GetxController
@@ -43,6 +44,8 @@ class AssetDetailsController extends GetxController
   final GetCryptoCandlesUseCase? getCryptoCandlesUseCase;
   final GetCryptoTickerUseCase? getCryptoTickerUseCase;
   final GetMaterialPriceUseCase? getMaterialPriceUseCase;
+  final GetCurrencyHistoryUseCase? getCurrencyHistoryUseCase;
+  final GetCurrencyLivePricesUseCase? getCurrencyLivePricesUseCase;
   final GetAllPostsUseCase getAllPostsUseCase;
   final TogglePostVoteUseCase togglePostVoteUseCase;
   final ToggleBookmarkUseCase toggleBookmarkUseCase;
@@ -50,6 +53,7 @@ class AssetDetailsController extends GetxController
   final GetWatchlistStatusUseCase getWatchlistStatusUseCase;
   final GetLatestNewsUseCase? getLatestNewsUseCase;
   final SummarizeNewsUseCase? summarizeNewsUseCase;
+  final GetLatestAiPredictionUseCase? getLatestAiPredictionUseCase;
 
   AssetDetailsController({
     required this.stockId,
@@ -60,6 +64,8 @@ class AssetDetailsController extends GetxController
     this.getCryptoCandlesUseCase,
     this.getCryptoTickerUseCase,
     this.getMaterialPriceUseCase,
+    this.getCurrencyHistoryUseCase,
+    this.getCurrencyLivePricesUseCase,
     required this.getAllPostsUseCase,
     required this.togglePostVoteUseCase,
     required this.toggleBookmarkUseCase,
@@ -67,6 +73,7 @@ class AssetDetailsController extends GetxController
     required this.getWatchlistStatusUseCase,
     this.getLatestNewsUseCase,
     this.summarizeNewsUseCase,
+    this.getLatestAiPredictionUseCase,
   });
 
   // Observables - Chart & Price
@@ -108,9 +115,12 @@ class AssetDetailsController extends GetxController
 
   // Chart
   var selectedTimeRange = '1D'.obs;
-  List<String> get timeRanges => assetType.isCrypto
+  List<String> get timeRanges => assetType.isCurrency
+      ? ['1M', '3M', '6M', '1Y', 'All']
+      : assetType.isCrypto
       ? ['1D', '5D', '1W', '1M', '6M', '1Y', 'All']
       : ['1D', '5D', '1W', '1M', '6M', '1Y', 'All'];
+
   var selectedSpotX = Rxn<double>();
 
   // Watchlist
@@ -120,9 +130,42 @@ class AssetDetailsController extends GetxController
   var isEgp = false.obs;
   final double usdToEgpRate = 51.0;
 
-  // Technical analysis — anchored to fixed 15m timeframe
-  var technicalResult = Rxn<TechnicalResult>();
-  var gaugeCandles = <CandleEntity>[].obs;
+  // ── Currency (forex) state ──────────────────────────────────────────────────
+  var currentRate = 0.0.obs;
+  var currencySymbolObs = ''.obs; // tracks active currency for changeCurrency()
+
+  final Map<String, String> supportedCurrencies = {
+    'USDEGP': 'US Dollar',
+    'EUREGP': 'Euro',
+    'GBPEGP': 'British Pound',
+    'JPYEGP': 'Japanese Yen',
+    'CHFEGP': 'Swiss Franc',
+    'SAREGP': 'Saudi Riyal',
+    'AEDEGP': 'UAE Dirham',
+    'KWDEGP': 'Kuwaiti Dinar',
+    'QAREGP': 'Qatari Riyal',
+    'JODEGP': 'Jordanian Dinar',
+  };
+
+  final Map<String, String> currencyFlags = {
+    'USDEGP': '🇺🇸',
+    'EUREGP': '🇪🇺',
+    'GBPEGP': '🇬🇧',
+    'JPYEGP': '🇯🇵',
+    'CHFEGP': '🇨🇭',
+    'SAREGP': '🇸🇦',
+    'AEDEGP': '🇦🇪',
+    'KWDEGP': '🇰🇼',
+    'QAREGP': '🇶🇦',
+    'JODEGP': '🇯🇴',
+  };
+
+  String get currencyName =>
+      supportedCurrencies[currencySymbolObs.value] ?? currencySymbolObs.value;
+  String get currencyFlag => currencyFlags[currencySymbolObs.value] ?? '💱';
+
+  // AI Prediction
+  var aiPrediction = Rxn<AiPrediction>();
 
   // Timers & WebSocket
   Timer? _voteDebounceTimer;
@@ -137,18 +180,23 @@ class AssetDetailsController extends GetxController
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
 
-    fetchNews(refresh: true);
-    checkWatchlistStatus();
-    fetchPosts();
-
-    if (assetType.isCrypto) {
-      _initCryptoData();
+    if (assetType.isCurrency) {
+      checkWatchlistStatus(); // Currencies support watchlist
+      fetchNews(refresh: true);
+      _initCurrencyData();
     } else {
-      _initStockData();
-    }
+      fetchNews(refresh: true);
+      checkWatchlistStatus();
+      fetchPosts();
 
-    // Fetch dedicated 15m data for Technical Gauge
-    _fetchGaugeCandles();
+      if (assetType.isCrypto) {
+        _initCryptoData();
+      } else {
+        _initStockData();
+      }
+
+      fetchAiPrediction();
+    }
   }
 
   @override
@@ -173,81 +221,13 @@ class AssetDetailsController extends GetxController
 
   // ============ HELPER METHODS ============
 
-  /// Compute technical analysis score from dedicated 15m gauge candles.
-  void calculateTechnicals() {
-    if (gaugeCandles.isEmpty) {
-      technicalResult.value = TechnicalResult.empty;
-      return;
-    }
-    final isEgx = assetType.isStock && !assetType.isMaterial;
-    technicalResult.value = TechnicalAnalysisService.calculateTechnicalScore(
-      gaugeCandles.toList(),
-      isEgx: isEgx,
-    );
-  }
-
-  /// Fetch dedicated 15m candle data for the Technical Gauge.
-  /// Independent from chart timeframe — always 15m "Hawk's Eye" view.
-  Future<void> _fetchGaugeCandles() async {
+  Future<void> fetchAiPrediction() async {
+    if (getLatestAiPredictionUseCase == null) return;
     try {
-      const gaugeInterval = '15m';
-      const gaugeLimit = 100;
-
-      if (assetType.isCrypto) {
-        // Crypto → use existing use case with 15m interval
-        final candles = await getCryptoCandlesUseCase!(
-          symbol: symbol,
-          interval: gaugeInterval,
-          limit: gaugeLimit,
-        );
-        gaugeCandles.value = candles;
-      } else if (assetType.isMaterial) {
-        // Gold/Silver → Binance directly
-        final binanceSymbol = symbol == 'GOLD' ? 'PAXGUSDT' : 'LTCUSDT';
-        final url =
-            'https://api.binance.com/api/v3/klines?symbol=$binanceSymbol&interval=$gaugeInterval&limit=$gaugeLimit';
-        final response = await http.get(Uri.parse(url));
-        if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body);
-          gaugeCandles.value = data.map((item) {
-            return CandleEntity(
-              candleTime: DateTime.fromMillisecondsSinceEpoch(item[0]),
-              open: double.parse(item[1]),
-              high: double.parse(item[2]),
-              low: double.parse(item[3]),
-              close: double.parse(item[4]),
-              volume: double.parse(item[5]).toInt(),
-              timeframe: gaugeInterval,
-            );
-          }).toList();
-        }
-      } else {
-        // EGX stock → fetch 1m data via use case, aggregate to 15m
-        final candleTableName =
-            Get.arguments?['candle_table_name'] ?? 'egx30_candles';
-        final data = await getStockCandlesUseCase!(
-          symbol: symbol,
-          tableName: candleTableName,
-          interval: '1m',
-          limit: 1500,
-        );
-        if (data.isNotEmpty) {
-          data.sort((a, b) => a.candleTime.compareTo(b.candleTime));
-          final aggregated = CandleAggregator.aggregate(data, 15);
-          // Deduplicate
-          final Map<String, CandleEntity> unique = {};
-          for (var c in aggregated) {
-            unique[c.candleTime.toIso8601String()] = c;
-          }
-          gaugeCandles.value = unique.values.toList()
-            ..sort((a, b) => a.candleTime.compareTo(b.candleTime));
-        }
-      }
-
-      calculateTechnicals();
+      final prediction = await getLatestAiPredictionUseCase!(symbol);
+      aiPrediction.value = prediction;
     } catch (e) {
-      // print('Gauge candle fetch error: $e');
-      technicalResult.value = TechnicalResult.empty;
+      aiPrediction.value = null;
     }
   }
 
@@ -310,13 +290,117 @@ class AssetDetailsController extends GetxController
     startPolling();
   }
 
+  Future<void> _initCurrencyData() async {
+    currencySymbolObs.value = symbol;
+    // Currency charts use monthly granularity — default to 1-month view
+    selectedTimeRange.value = '1M';
+    // Try to get the current rate from arguments first
+    final args = Get.arguments;
+    if (args != null && args['current_price'] != null) {
+      currentRate.value = (args['current_price'] as num).toDouble();
+    }
+    // Kick off live prices in background + chart data
+    _fetchCurrencyLivePrices();
+    await fetchCurrencyData(selectedTimeRange.value);
+  }
+
+  Future<void> _fetchCurrencyLivePrices() async {
+    try {
+      if (getCurrencyLivePricesUseCase == null) return;
+      final prices = await getCurrencyLivePricesUseCase!();
+      final rate = prices[currencySymbolObs.value];
+      if (rate != null) currentRate.value = rate;
+    } catch (_) {}
+  }
+
+  /// Switch the active currency (called from the dropdown in the title bar)
+  void changeCurrency(String newSymbol) {
+    if (currencySymbolObs.value == newSymbol) return;
+    currencySymbolObs.value = newSymbol;
+    candleData.clear();
+    currentRate.value = 0.0;
+    _fetchCurrencyLivePrices();
+    fetchCurrencyData(selectedTimeRange.value);
+  }
+
+  /// Fetch historical rate data for the active currency
+  Future<void> fetchCurrencyData(String range) async {
+    if (getCurrencyHistoryUseCase == null) return;
+    isLoadingChart.value = true;
+    try {
+      int days;
+      switch (range) {
+        case '1M':
+          days = 30;
+          break;
+        case '3M':
+          days = 90;
+          break;
+        case '6M':
+          days = 180;
+          break;
+        case '1Y':
+          days = 365;
+          break;
+        case 'All':
+          days = 3650;
+          break;
+        default:
+          days = 30;
+      }
+
+      var candles = await getCurrencyHistoryUseCase!(
+        currencySymbolObs.value,
+        days,
+      );
+      candles.sort((a, b) => a.candleTime.compareTo(b.candleTime));
+
+      // For ALL range, sample one candle per month to avoid too many points
+      if (range == 'ALL' && candles.length > 100) {
+        final List<CandleEntity> sampled = [];
+        String? lastMonth;
+        for (final c in candles) {
+          final monthKey = '${c.candleTime.year}-${c.candleTime.month}';
+          if (lastMonth != monthKey) {
+            sampled.add(c);
+            lastMonth = monthKey;
+          }
+        }
+        if (candles.isNotEmpty &&
+            sampled.isNotEmpty &&
+            sampled.last.candleTime != candles.last.candleTime) {
+          sampled.add(candles.last);
+        }
+        candles = sampled;
+      }
+
+      candleData.value = candles;
+
+      if (candles.isNotEmpty) {
+        if (currentRate.value == 0) currentRate.value = candles.last.close;
+        isPositivePerformance.value = candles.last.close >= candles.first.close;
+        if (candles.length > 1) {
+          prevClosePrice.value = candles[candles.length - 2].close;
+        } else {
+          prevClosePrice.value = candles.first.close;
+        }
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      isLoadingChart.value = false;
+    }
+  }
+
   // ============ CHART DATA ============
 
   void updateTimeRange(String range) {
     if (selectedTimeRange.value == range) return;
     selectedTimeRange.value = range;
 
-    if (assetType.isCrypto) {
+    if (assetType.isCurrency) {
+      fetchCurrencyData(range);
+    } else if (assetType.isCrypto) {
       fetchHistoricalData(range);
       connectWebSocket(); // Reconnect with new interval
     } else {
@@ -804,7 +888,16 @@ class AssetDetailsController extends GetxController
     try {
       List<NewsEntity> news = [];
 
-      if (assetType.isCrypto) {
+      if (assetType.isCurrency) {
+        // Currencies — fetch general forex/currency news by category
+        if (getLatestNewsUseCase != null) {
+          news = await getLatestNewsUseCase!(
+            category: 'Currencies',
+            limit: newsLimit,
+            offset: newsPage * newsLimit,
+          );
+        }
+      } else if (assetType.isCrypto) {
         // Fetch crypto news from stock_news table
         final response = await Supabase.instance.client
             .from('stock_news')

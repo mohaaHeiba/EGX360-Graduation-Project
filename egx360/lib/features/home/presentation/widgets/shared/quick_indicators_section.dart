@@ -1,5 +1,5 @@
 import 'package:egx/core/helper/context_extensions.dart';
-import 'package:egx/core/routes/app_pages.dart';
+import 'package:egx/features/home/data/models/stock_model.dart';
 import 'package:egx/features/home/presentation/controllers/home_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -72,24 +72,20 @@ class QuickIndicatorsSection extends GetView<HomeController> {
     Color color,
     double? price,
   ) {
-    final s = context.s;
     final formattedPrice = price != null
         ? '${price.toStringAsFixed(2)} EGP'
         : '-- EGP';
 
     return GestureDetector(
       onTap: () {
-        Get.toNamed(
-          AppPages.currencyDetailsPage,
-          arguments: {
-            'id': symbol,
-            'symbol': symbol,
-            'stock_name': name,
-            'sector': s.currency_sector,
-            'description': s.currency_desc(name),
-            'current_price': price ?? 0.0,
-          },
+        final stock = StockModel(
+          id: symbol,
+          symbol: symbol,
+          companyNameEn: name,
+          sector: 'Currencies',
+          currentPrice: price,
         );
+        controller.openStockDetails(stock);
       },
       child: _IndicatorCard(
         title: '$name/EGP',
@@ -104,7 +100,7 @@ class QuickIndicatorsSection extends GetView<HomeController> {
   Widget _buildGoldCard(BuildContext context) {
     return Obx(() {
       final materialPrice = controller.materialPrice.value;
-      final price = materialPrice?.price21k ?? 0.0;
+      final price = materialPrice?.p21Sell ?? 0.0;
       final formattedPrice = NumberFormat.currency(
         symbol: '',
         decimalDigits: 0,
@@ -129,7 +125,7 @@ class QuickIndicatorsSection extends GetView<HomeController> {
   Widget _buildSilverCard(BuildContext context) {
     return Obx(() {
       final materialPrice = controller.materialPrice.value;
-      final price = materialPrice?.silver999 ?? 0.0;
+      final price = materialPrice?.silver999Sell ?? 0.0;
       final formattedPrice = NumberFormat.currency(
         symbol: '',
         decimalDigits: 0,

@@ -158,7 +158,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   @override
   Future<MaterialPriceModel?> getLatestMaterialPrice() async {
     final response = await supabase
-        .from('material_prices')
+        .from('materials_prices')
         .select()
         .order('timestamp', ascending: false)
         .limit(1)

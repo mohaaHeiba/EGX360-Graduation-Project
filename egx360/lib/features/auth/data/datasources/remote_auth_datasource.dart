@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:egx/core/services/desktop_deep_link_service.dart';
 import 'package:egx/core/errors/app_exception.dart';
 import 'package:egx/core/services/network_service.dart';
 import 'package:egx/features/auth/data/model/auth_model.dart';
@@ -52,11 +53,16 @@ class RemoteAuthDatasourceImpl implements RemoteAuthDatasource {
     required String password,
   }) async {
     try {
+      final isDesktop = Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+      final redirectTo = isDesktop 
+          ? 'http://localhost:54321/callback' 
+          : 'io.supabase.flutter://login-callback/';
+
       final res = await supabase.auth.signUp(
         email: email,
         password: password,
         data: {'name': name},
-        emailRedirectTo: 'io.supabase.flutter://login-callback/',
+        emailRedirectTo: redirectTo,
       );
 
       if (res.user != null) {
@@ -178,9 +184,14 @@ class RemoteAuthDatasourceImpl implements RemoteAuthDatasource {
   @override
   Future<void> resetPassword(String email) async {
     try {
+      final isDesktop = Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+      final redirectTo = isDesktop 
+          ? 'http://localhost:54321/reset-password' 
+          : 'io.supabase.flutter://reset-password/';
+
       await supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'io.supabase.flutter://reset-password/',
+        redirectTo: redirectTo,
       );
     } on AuthApiException catch (e) {
       if (e.code == 'invalid_credentials' ||
@@ -221,72 +232,27 @@ class RemoteAuthDatasourceImpl implements RemoteAuthDatasource {
       if (Platform.isLinux || Platform.isWindows) {
         print("💻 DEBUG: Desktop detected. Starting local server for OAuth...");
 
-        // 1. Start local server to listen for callback
-        // We use port 54321 as it's the standard Supabase local dev port
-        final server = await HttpServer.bind(
-          InternetAddress.loopbackIPv4,
-          54321,
+        // 1. Start OAuth flow pointing to our local server
+        await supabase.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'http://localhost:54321/callback',
+          authScreenLaunchMode: LaunchMode.externalApplication,
+          queryParams: {
+            'access_type': 'offline', // refresh token
+            'prompt': 'select_account', //always ask account
+          },
         );
 
-        try {
-          // 2. Start OAuth flow pointing to our local server
-          await supabase.auth.signInWithOAuth(
-            OAuthProvider.google,
-            redirectTo: 'http://localhost:54321/callback',
-            authScreenLaunchMode: LaunchMode.externalApplication,
-            queryParams: {
-              'access_type': 'offline', // refresh token
-              'prompt': 'select_account', //always ask account
-            },
-          );
+        print("🌐 DEBUG: Browser opened. Waiting for callback on localhost:54321...");
 
-          print(
-            "🌐 DEBUG: Browser opened. Waiting for callback on localhost:54321...",
-          );
+        // 2. Wait for the callback request from our global service
+        final uri = await DesktopDeepLinkService().uriStream.firstWhere((u) => u.queryParameters.containsKey('code'));
+        
+        final code = uri.queryParameters['code'];
+        print("✅ DEBUG: Auth code received!");
 
-          // 3. Wait for the callback request
-          await for (final HttpRequest request in server) {
-            final uri = request.uri;
-
-            // Allow basic favicon requests without breaking the loop
-            if (uri.path == '/favicon.ico') {
-              request.response.statusCode = HttpStatus.notFound;
-              await request.response.close();
-              continue;
-            }
-
-            // Check for auth code (accept root path or /callback)
-            if (uri.queryParameters.containsKey('code')) {
-              final code = uri.queryParameters['code'];
-              print("✅ DEBUG: Auth code received!");
-
-              // Exchange code for session
-              await supabase.auth.exchangeCodeForSession(code!);
-
-              // Show success message to user in browser
-              request.response
-                ..statusCode = HttpStatus.ok
-                ..headers.contentType = ContentType.html
-                ..write('''
-                  <html>
-                    <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #121212; color: #fff;">
-                      <h1>Login Successful!</h1>
-                      <p>You can close this tab and return to the application.</p>
-                      <script>window.close();</script>
-                    </body>
-                  </html>
-                ''');
-              await request.response.close();
-              break; // Stop listening
-            } else {
-              // Handle other requests
-              request.response.statusCode = HttpStatus.badRequest;
-              await request.response.close();
-            }
-          }
-        } finally {
-          await server.close();
-        }
+        // Exchange code for session
+        await supabase.auth.exchangeCodeForSession(code!);
 
         // 4. Return user profile (now logged in)
         final user = supabase.auth.currentUser;

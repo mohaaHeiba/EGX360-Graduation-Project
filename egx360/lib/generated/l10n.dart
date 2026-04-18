@@ -5665,11 +5665,61 @@ class S {
     );
   }
 
-  /// `Silver 800`
-  String get asset_details_silver_800 {
+  /// `Silver 925`
+  String get asset_details_silver_925 {
     return Intl.message(
-      'Silver 800',
-      name: 'asset_details_silver_800',
+      'Silver 925',
+      name: 'asset_details_silver_925',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Gold Ounce`
+  String get asset_details_gold_ounce {
+    return Intl.message(
+      'Gold Ounce',
+      name: 'asset_details_gold_ounce',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Gold Pound`
+  String get asset_details_gold_pound {
+    return Intl.message(
+      'Gold Pound',
+      name: 'asset_details_gold_pound',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Gold Bar 50g`
+  String get asset_details_gold_bar_50g {
+    return Intl.message(
+      'Gold Bar 50g',
+      name: 'asset_details_gold_bar_50g',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Gold Bar 100g`
+  String get asset_details_gold_bar_100g {
+    return Intl.message(
+      'Gold Bar 100g',
+      name: 'asset_details_gold_bar_100g',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Gold Bar 250g`
+  String get asset_details_gold_bar_250g {
+    return Intl.message(
+      'Gold Bar 250g',
+      name: 'asset_details_gold_bar_250g',
       desc: '',
       args: [],
     );

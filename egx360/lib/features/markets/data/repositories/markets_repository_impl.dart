@@ -1,3 +1,4 @@
+import 'package:egx/features/markets/domain/entities/ai_prediction.dart';
 import 'package:egx/features/markets/domain/repositories/markets_repository.dart';
 import 'package:egx/features/markets/data/datasources/markets_remote_datasource.dart';
 import 'package:egx/features/search/domain/entities/stock_entity.dart';
@@ -44,5 +45,10 @@ class MarketsRepositoryImpl implements MarketsRepository {
       limit: limit,
     );
     return models.map((model) => model.toEntity()).toList();
+  }
+
+  @override
+  Future<AiPrediction?> getLatestAiPrediction(String symbol) async {
+    return await remoteDataSource.getLatestAiPrediction(symbol);
   }
 }

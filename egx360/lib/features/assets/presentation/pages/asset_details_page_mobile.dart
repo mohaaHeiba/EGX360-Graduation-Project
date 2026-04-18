@@ -4,6 +4,7 @@ import 'package:egx/features/assets/presentation/widgets/shared/chart_loading_sh
 import 'package:egx/features/assets/presentation/widgets/shared/build_overview_tab.dart';
 import 'package:egx/features/assets/presentation/widgets/shared/build_chart.dart';
 import 'package:egx/features/assets/presentation/widgets/shared/build_community_tab.dart';
+import 'package:egx/features/assets/presentation/widgets/shared/build_currency_calculator_tab.dart';
 import 'package:egx/features/assets/presentation/widgets/mobile/build_news_tab_mobile.dart';
 import 'package:egx/features/assets/presentation/widgets/mobile/build_price_header_mobile.dart';
 import 'package:egx/features/assets/presentation/controllers/asset_details_controller.dart';
@@ -30,8 +31,10 @@ class _AssetDetailsPageMobileState extends State<AssetDetailsPageMobile>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     controller = Get.find<AssetDetailsController>();
+    // Currency has 3 tabs: Overview, News, Calculator
+    final tabCount = controller.assetType.isCurrency ? 3 : 4;
+    _tabController = TabController(length: tabCount, vsync: this);
   }
 
   // Tooltip State
@@ -96,48 +99,53 @@ class _AssetDetailsPageMobileState extends State<AssetDetailsPageMobile>
                   ),
                 ),
               ),
-              title: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundImage: NetworkImage(stockData['logo_url'] ?? ''),
-                    backgroundColor: Colors.grey[800],
-                    child: stockData['logo_url'] == null
-                        ? Text(
-                            stockName.isNotEmpty ? stockName[0] : '?',
-                            style: context.textStyles.bodyMedium?.copyWith(
-                              color: context.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+              title: controller.assetType.isCurrency
+                  ? _buildCurrencyTitle(context)
+                  : Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundImage: NetworkImage(
+                            stockData['logo_url'] ?? '',
+                          ),
+                          backgroundColor: Colors.grey[800],
+                          child: stockData['logo_url'] == null
+                              ? Text(
+                                  stockName.isNotEmpty ? stockName[0] : '?',
+                                  style: context.textStyles.bodyMedium
+                                      ?.copyWith(
+                                        color: context.onSurface,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              stockName,
+                              style: context.textStyles.bodyMedium?.copyWith(
+                                color: context.onSurface,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        stockName,
-                        style: context.textStyles.bodyMedium?.copyWith(
-                          color: context.onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                            Text(
+                              isIndex
+                                  ? S.of(context).asset_details_index_label
+                                  : S.of(context).asset_details_stock_label,
+                              style: context.textStyles.bodyMedium?.copyWith(
+                                color: context.onSurface,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        isIndex
-                            ? S.of(context).asset_details_index_label
-                            : S.of(context).asset_details_stock_label,
-                        style: context.textStyles.bodyMedium?.copyWith(
-                          color: context.onSurface,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                      ],
+                    ),
               actions: [
                 Obx(() {
                   final isMaterial =
@@ -279,54 +287,136 @@ class _AssetDetailsPageMobileState extends State<AssetDetailsPageMobile>
               delegate: _SliverAppBarDelegate(
                 Container(
                   color: context.background,
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorColor: context.primary,
-                    labelColor: context.primary,
-                    unselectedLabelColor: Colors.grey,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                    indicatorSize: TabBarIndicatorSize.label,
-                    tabs: [
-                      Tab(text: S.of(context).asset_details_tab_overview),
-                      Tab(text: S.of(context).asset_details_tab_news),
-                      Tab(text: S.of(context).asset_details_tab_community),
-                      Tab(text: S.of(context).asset_details_tab_live_chat),
-                    ],
-                  ),
+                  child: controller.assetType.isCurrency
+                      ? TabBar(
+                          controller: _tabController,
+                          indicatorColor: context.primary,
+                          labelColor: context.primary,
+                          unselectedLabelColor: Colors.grey,
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          indicatorSize: TabBarIndicatorSize.label,
+                          tabs: [
+                            const Tab(text: 'Overview'),
+                            Tab(text: S.of(context).asset_details_tab_news),
+                            const Tab(text: 'Calculator'),
+                          ],
+                        )
+                      : TabBar(
+                          controller: _tabController,
+                          indicatorColor: context.primary,
+                          labelColor: context.primary,
+                          unselectedLabelColor: Colors.grey,
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          indicatorSize: TabBarIndicatorSize.label,
+                          tabs: [
+                            Tab(text: S.of(context).asset_details_tab_overview),
+                            Tab(text: S.of(context).asset_details_tab_news),
+                            Tab(
+                              text: S.of(context).asset_details_tab_community,
+                            ),
+                            Tab(
+                              text: S.of(context).asset_details_tab_live_chat,
+                            ),
+                          ],
+                        ),
                 ),
               ),
               pinned: true,
             ),
           ];
         },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            Obx(() {
-              final isMaterial =
-                  controller.symbol == 'GOLD' || controller.symbol == 'SILVER';
-              return buildOverviewTab(
-                stockData,
-                controller.candleData,
-                symbol: controller.symbol,
-                materialPrice: controller.materialPrice.value,
-                livePrevClose: controller.assetType.isCrypto
-                    ? controller.prevClosePrice.value
-                    : null,
-                isIndex: isIndex,
-                isEgp: isMaterial ? controller.isEgp.value : true,
-                isCurrency: false,
-                rate: isMaterial ? controller.usdToEgpRate : 1.0,
-                technicalResult: controller.technicalResult.value,
-              );
-            }),
-            buildNewsTab(context, controller),
-            buildCommunityTab(controller),
-            AssetLiveChatTab(stockData: stockData),
-          ],
-        ),
+        body: controller.assetType.isCurrency
+            ? TabBarView(
+                controller: _tabController,
+                children: [
+                  Obx(
+                    () => buildOverviewTab(
+                      stockData,
+                      controller.candleData,
+                      symbol: controller.currencySymbolObs.value,
+                      livePrevClose: controller.prevClosePrice.value,
+                      isIndex: false,
+                      isCurrency: true,
+                      rate: 1.0,
+                      aiPrediction: controller.aiPrediction.value,
+                    ),
+                  ),
+                  buildNewsTab(context, controller),
+                  buildCurrencyCalculatorTab(controller),
+                ],
+              )
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  Obx(() {
+                    final isMaterial =
+                        controller.symbol == 'GOLD' ||
+                        controller.symbol == 'SILVER';
+                    return buildOverviewTab(
+                      stockData,
+                      controller.candleData,
+                      symbol: controller.symbol,
+                      materialPrice: controller.materialPrice.value,
+                      livePrevClose: controller.assetType.isCrypto
+                          ? controller.prevClosePrice.value
+                          : null,
+                      isIndex: isIndex,
+                      isEgp: isMaterial ? controller.isEgp.value : true,
+                      isCurrency: false,
+                      rate: isMaterial ? controller.usdToEgpRate : 1.0,
+                      aiPrediction: controller.aiPrediction.value,
+                    );
+                  }),
+                  buildNewsTab(context, controller),
+                  buildCommunityTab(controller),
+                  AssetLiveChatTab(stockData: stockData),
+                ],
+              ),
       ),
     );
+  }
+
+  /// Currency-specific title with flag + name
+  Widget _buildCurrencyTitle(BuildContext context) {
+    return Obx(() {
+      return Row(
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: Colors.transparent,
+            child: Text(
+              controller.currencyFlag,
+              style: const TextStyle(fontSize: 22),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                controller.currencyName,
+                style: context.textStyles.bodyMedium?.copyWith(
+                  color: context.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Currency • EGP',
+                style: context.textStyles.bodyMedium?.copyWith(
+                  color: context.onSurface,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    });
   }
 }
 

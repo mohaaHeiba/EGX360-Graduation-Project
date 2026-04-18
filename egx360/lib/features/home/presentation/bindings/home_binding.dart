@@ -12,9 +12,10 @@ import 'package:get/get.dart';
 import 'package:egx/features/assets/data/datasources/crypto_remote_data_source.dart';
 import 'package:egx/features/assets/data/repositories/crypto_repository.dart';
 import 'package:egx/features/assets/data/repositories/crypto_repository_impl.dart';
-import 'package:egx/features/currency/data/datasources/currency_remote_datasource.dart';
-import 'package:egx/features/currency/data/repositories/currency_repository_impl.dart';
-import 'package:egx/features/currency/domain/usecases/get_live_currency_prices_usecase.dart';
+import 'package:egx/features/assets/data/datasources/currency_remote_data_source.dart';
+import 'package:egx/features/assets/data/datasources/stock_remote_data_source.dart';
+import 'package:egx/features/assets/data/repositories/asset_repository_impl.dart';
+import 'package:egx/features/assets/domain/usecases/get_currency_live_prices_usecase.dart';
 import 'package:egx/features/notifications/data/datasource/notification_remote_datasource.dart';
 import 'package:egx/features/notifications/data/repository/notification_repository_impl.dart';
 import 'package:egx/features/notifications/domain/repository/notification_repository.dart';
@@ -61,17 +62,21 @@ class HomeBinding extends Bindings {
     );
     Get.lazyPut(() => GetStockDetailsUseCase(Get.find<HomeRepositoryImpl>()));
 
-    // Currency
+    // Currency - uses assets-based datasource and repository
     Get.lazyPut<CurrencyRemoteDataSource>(
       () => CurrencyRemoteDataSourceImpl(client: http.Client()),
     );
-    Get.lazyPut<CurrencyRepositoryImpl>(
-      () => CurrencyRepositoryImpl(
-        remoteDataSource: Get.find<CurrencyRemoteDataSource>(),
+    Get.lazyPut<AssetRepositoryImpl>(
+      () => AssetRepositoryImpl(
+        cryptoRemoteDataSource: Get.find<CryptoRemoteDataSource>(),
+        stockRemoteDataSource: StockRemoteDataSourceImpl(
+          Supabase.instance.client,
+        ),
+        currencyRemoteDataSource: Get.find<CurrencyRemoteDataSource>(),
       ),
     );
     Get.lazyPut(
-      () => GetLiveCurrencyPricesUseCase(Get.find<CurrencyRepositoryImpl>()),
+      () => GetCurrencyLivePricesUseCase(Get.find<AssetRepositoryImpl>()),
     );
 
     // Controller

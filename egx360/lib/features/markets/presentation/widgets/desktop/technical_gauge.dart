@@ -11,6 +11,8 @@ class TechnicalGauge extends StatelessWidget {
   final TechnicalResult? result;
   final VoidCallback? onMoreTap;
   final bool display;
+  final bool isAi;
+  final String? customRecommendation;
 
   const TechnicalGauge({
     super.key,
@@ -18,6 +20,8 @@ class TechnicalGauge extends StatelessWidget {
     this.result,
     this.onMoreTap,
     this.display = true,
+    this.isAi = false,
+    this.customRecommendation,
   });
 
   @override
@@ -26,7 +30,9 @@ class TechnicalGauge extends StatelessWidget {
     final normalizedValue = ((value + 100) / 200).clamp(0.0, 1.0);
 
     String recommendationLabel;
-    if (result != null) {
+    if (customRecommendation != null) {
+      recommendationLabel = customRecommendation!;
+    } else if (result != null) {
       recommendationLabel = _getLocalizedRecommendation(
         context,
         result!.recommendation,
@@ -44,6 +50,7 @@ class TechnicalGauge extends StatelessWidget {
     }
 
     final rawRecommendation =
+        customRecommendation ??
         result?.recommendation ??
         (value < -60
             ? 'Strong Sell'
@@ -69,8 +76,8 @@ class TechnicalGauge extends StatelessWidget {
               value: normalizedValue,
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               isDark: isDark,
-              buyLabel: context.s.gauge_buy,
-              sellLabel: context.s.gauge_sell,
+              buyLabel: isAi ? 'Bullish' : context.s.gauge_buy,
+              sellLabel: isAi ? 'Bearish' : context.s.gauge_sell,
             ),
           ),
         ),

@@ -9,6 +9,7 @@ PreferredSizeWidget? customAppbar(
   final bool isActions = false,
   final bool withIcon = false,
   final IconData iconData = Icons.auto_awesome,
+  final List<Widget>? customActions,
 }) {
   // فحص إذا كان العرض ديسكتوب أو تابلت لإخفاء الـ AppBar
   // نستخدم Get.context!.isDesktop أو فحص العرض مباشرة
@@ -86,7 +87,7 @@ PreferredSizeWidget? customAppbar(
               );
       },
     ),
-    actions: [
+    actions: customActions ?? [
       if (isActions)
         IconButton(
           onPressed: () => Get.toNamed(AppPages.savedPosts),
