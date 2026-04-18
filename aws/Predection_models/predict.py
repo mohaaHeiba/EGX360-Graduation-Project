@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
 import joblib
@@ -6,16 +7,22 @@ from supabase import create_client, Client
 import warnings
 import os
 
-# إخفاء التحذيرات المزعجة في الـ Terminal
 warnings.filterwarnings('ignore')
 
 # ==========================================
 # 1. إعدادات النظام (Configuration)
 # ==========================================
-URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-# ⚠️ تأكد إن ده الـ Service Role Key عشان يقدر يكتب في الـ Database من غير مشاكل RLS
-KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew"
-supabase: Client = create_client(URL, KEY)
+
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # مسار الموديل العام (Fallback)
 GENERAL_MODEL_PATH = "EGX360_Final_Model_v8.pkl"

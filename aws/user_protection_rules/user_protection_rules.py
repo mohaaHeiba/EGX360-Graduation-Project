@@ -1,22 +1,28 @@
+import os
 import time
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, messaging
 from supabase import create_client, Client
 
 # ==============================================================================
-# 1. CONFIGURATION (الإعدادات)
+# 1. CONFIGURATION 
 # ==============================================================================
-SUPABASE_URL = "https://zlcddmhcxtxvgzxcfvxx.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2RkbWhjeHR4dmd6eGNmdnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyOTM0MTcsImV4cCI6MjA4MDg2OTQxN30.F5SxofdTfi9oBO3db1nygSXIiYEqoXgZ0OTW_Fu5Kew" # ⚠️ يجب استخدام Service Role للبيع
-SERVICE_ACCOUNT_PATH = "service_account.json"
 
-# إعدادات المحرك
-GLOBAL_PROFIT_THRESHOLD = 5.0  # تنبيه ربح عند 5% ثابتة للجميع
-REGULAR_COOLDOWN = 1800        # 30 دقيقة في الوقت العادي
-HOT_ZONE_COOLDOWN = 600        # 10 دقائق في الافتتاح والإغلاق (لأن الحركة سريعة)
+SERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), '..', 'service_account.json')
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 
-# تهيئة Firebase و Supabase
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+GLOBAL_PROFIT_THRESHOLD = 5.0  # Flat 5% profit alert for all users
+REGULAR_COOLDOWN = 1800        # 30-minute cooldown during regular market hours
+HOT_ZONE_COOLDOWN = 600        # 10-minute cooldown during market open/close (high volatility)
+
+# Initialize Firebase and Supabase
 if not firebase_admin._apps:
     cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
     firebase_admin.initialize_app(cred)
@@ -24,12 +30,11 @@ if not firebase_admin._apps:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==============================================================================
-# 2. UTILITY FUNCTIONS (وظائف مساعدة)
+# 2. UTILITY FUNCTIONS 
 # ==============================================================================
 
 def is_market_hot_zone():
-    """التحقق مما إذا كنا في أول أو آخر 30 دقيقة من جلسة البورصة المصرية (10:00 - 14:30)"""
-    # توقيت مصر (UTC +2)
+    # Egypt Time (UTC +2)
     now_egypt = datetime.now(timezone.utc) + timedelta(hours=2)
     current_time = now_egypt.time()
     
@@ -60,24 +65,23 @@ def get_live_price(symbol):
     except: return None
 
 # ==============================================================================
-# 3. CORE LOGIC (المحرك)
+# 3. CORE LOGIC 
 # ==============================================================================
 
 def execute_protection():
     print(f"\n--- Cycle Started: {datetime.now().strftime('%H:%M:%S')} ---")
     
-    # تحديد مدة الـ Cooldown الحالية بناءً على توقيت السوق
     current_cooldown = HOT_ZONE_COOLDOWN if is_market_hot_zone() else REGULAR_COOLDOWN
     if is_market_hot_zone(): print("🔥 Market Hot Zone Detected! Increased Sensitivity Enabled.")
 
-    # جلب كل القواعد النشطة
+    # Fetch all active rules
     rules = supabase.table("user_protection_rules").select("*, profiles(fcm_token)").execute()
 
     for rule in rules.data:
         user_id, symbol = rule['user_id'], rule['symbol']
         fcm_token = rule['profiles'].get('fcm_token')
 
-        # جلب بيانات المحفظة
+        # Fetch portfolio holdings
         holding = supabase.table("user_holdings").select("average_price, quantity").eq("user_id", user_id).eq("symbol", symbol).single().execute()
         if not holding.data or holding.data['quantity'] <= 0: continue
 
@@ -85,28 +89,28 @@ def execute_protection():
         market_price = get_live_price(symbol)
         if market_price is None: continue
 
-        # حساب التغير بنسبة مئوية
+        # Calculate percentage change
         # $$Change \% = \frac{\text{Current} - \text{Avg}}{\text{Avg}} \times 100$$
         change_pct = ((market_price - avg_price) / avg_price) * 100
         
-        # إدارة التوقيت (Cooldown)
+        # Manage alert cooldown
         last_alert = rule.get('last_alert_sent_at')
         seconds_since = (datetime.now(timezone.utc) - datetime.fromisoformat(last_alert.replace('Z', '+00:00'))).seconds if last_alert else 999999
 
-        # --- أ. تنبيه الأرباح (تلقائي 5% لكل الناس) ---
+        # --- A. Profit Alert (Automatic 5% for everyone) ---
         if change_pct >= GLOBAL_PROFIT_THRESHOLD and seconds_since >= current_cooldown:
             send_fcm(fcm_token, f"🚀 {symbol} Profit!", f"Your position is up {change_pct:.1f}%. Price: {market_price} EGP")
             supabase.table("user_protection_rules").update({"last_alert_sent_at": datetime.now(timezone.utc).isoformat()}).eq("id", rule['id']).execute()
 
-        # --- ب. تنبيه الخسارة (بناءً على إعدادات المستخدم) ---
+        # --- B. Loss Alert (Based on user settings) ---
         elif rule['is_alert_enabled'] and change_pct <= -float(rule['alert_percentage']):
             if seconds_since >= current_cooldown:
                 send_fcm(fcm_token, f"📉 {symbol} Drop Alert", f"{symbol} decreased by {abs(change_pct):.1f}%. Price: {market_price} EGP")
                 supabase.table("user_protection_rules").update({"last_alert_sent_at": datetime.now(timezone.utc).isoformat()}).eq("id", rule['id']).execute()
 
-        # --- ج. البيع التلقائي (الخسارة العنيفة) ---
+        # --- C. Auto-Sell (Severe loss / Stop-loss) ---
         if rule['is_sell_enabled'] and change_pct <= -float(rule['liquidation_percentage']):
-            # استدعاء دالة البيع في الـ SQL
+            # Call SQL sell function (RPC)
             try:
                 supabase.rpc("execute_trade", {
                     "p_user_id": user_id, "p_symbol": symbol, "p_type": "sell",
@@ -121,4 +125,4 @@ if __name__ == "__main__":
         try:
             execute_protection()
         except Exception as e: print(f"🚨 Engine Error: {e}")
-        time.sleep(60) # فحص كل دقيقة
+        time.sleep(60) # Check every minute

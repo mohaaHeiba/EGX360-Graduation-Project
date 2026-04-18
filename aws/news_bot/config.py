@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 
 
 # service_account
-base_path = os.path.dirname(os.path.abspath(__file__))
-SERVICE_ACCOUNT_PATH = os.path.join(base_path, "service_account.json")
+# base_path = os.path.dirname(os.path.abspath(__file__))
+
+SERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), '..', 'service_account.json')
 
 
 # env variables

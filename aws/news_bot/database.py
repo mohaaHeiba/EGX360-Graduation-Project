@@ -48,7 +48,13 @@ class DatabaseManager:
         except: return False
 
     def insert_news(self, data):
-        self.supabase.table("stock_news").insert(data).execute()
+        try:
+            self.supabase.table("stock_news").insert(data).execute()
+            return True   
+        
+        except Exception as e:
+            print(f"      ❌ DB Insert Skipped (Constraint/Duplicate)")
+            return False    
 
     def send_notification(self, symbol, news_title, news_url):
         try:

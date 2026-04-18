@@ -93,12 +93,17 @@ class EGX360Bot:
             "sentiment_label": sentiment, "published_at": formatted_date
         }
         
-        self.db.insert_news(data)
         
-        if send_alert: self.db.send_notification(symbol, title, url)
+        is_inserted = self.db.insert_news(data)   
+
+        if is_inserted:
+            if send_alert: self.db.send_notification(symbol, title, url)
+            print(f"      ✅ DB: Saved [{sentiment}] news for [{symbol}] from {source}")
+            return True 
+            
+        return False
         
-        print(f"      ✅ DB: Saved [{sentiment}] news for [{symbol}] from {source}")
-        return True 
+       
 
     def process_stocks(self, stocks_list):
         driver = self.setup_stock_driver()
@@ -138,6 +143,11 @@ class EGX360Bot:
                     final_url = self.resolve_url_with_selenium(entry.link, driver)
                     print(f"      🔗 Final URL: {final_url[:50]}...")
 
+                    if self.scraper.is_blacklisted(final_url, title):
+                        print(f"      ⏩ Skipped: Blacklisted domain (After Resolving)")
+                        continue
+
+                    
                     content = None
                     rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
 
@@ -221,6 +231,10 @@ class EGX360Bot:
                     print("      🚀 Resolving URL...")
                     final_url = self.resolve_url_with_selenium(link, driver)
                     
+                    if self.scraper.is_blacklisted(final_url, title):
+                        print("      ⏩ Skipped: Blacklisted domain (After Resolving)")
+                        continue
+                
                     rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
                     content_for_ai = f"{title}. {rss_desc}"
 
