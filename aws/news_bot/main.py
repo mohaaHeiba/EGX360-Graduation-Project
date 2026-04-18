@@ -1,0 +1,268 @@
+import time
+import feedparser
+import trafilatura
+import random
+from datetime import datetime, timezone
+from dateutil import parser
+from urllib.parse import quote
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from difflib import SequenceMatcher
+import re
+
+from database import DatabaseManager
+from ai_engine import AIEngine
+from scrapers import NewsScraper
+
+class EGX360Bot:
+    def __init__(self):
+        self.db = DatabaseManager()
+        self.ai = AIEngine()
+        self.scraper = NewsScraper()
+
+    def setup_stock_driver(self):
+        print("🌐 Starting Headless Chrome Driver...")
+        chrome_options = Options()
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--blink-settings=imagesEnabled=false")
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    def resolve_url_with_selenium(self, google_url, driver):
+        try:
+            driver.get(google_url)
+            time.sleep(2)
+            if "consent.google.com" in driver.current_url:
+                try:
+                    btns = driver.find_elements('tag name', 'button')
+                    for btn in btns:
+                        if btn.text in ['Accept all', 'I agree', 'موافق']:
+                            btn.click(); time.sleep(1); break
+                except: pass
+            return driver.current_url
+        except: return google_url
+
+    def build_smart_query(self, company_name, symbol):
+        clean_name = company_name.replace("المصرية", "").replace("القابضة", "").strip()
+        query = f'"{clean_name}" AND (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) when:5d'
+        return quote(query)
+
+    def is_fresh_news(self, entry, max_days=3):
+        try:
+            if hasattr(entry, 'published_parsed'):
+                pub_date = datetime(*entry.published_parsed[:6]).replace(tzinfo=timezone.utc)
+                return (datetime.now(timezone.utc) - pub_date).days <= max_days, pub_date
+            elif hasattr(entry, 'published'):
+                 pub_date = parser.parse(entry.published)
+                 if pub_date.tzinfo is None: pub_date = pub_date.replace(tzinfo=timezone.utc)
+                 return (datetime.now(timezone.utc) - pub_date).days <= max_days, pub_date
+        except: pass
+        return True, datetime.now(timezone.utc)
+
+    def process_and_save_news(self, stock_id, symbol, title, description, content, url, source, pub_date, is_api, send_alert):
+        if self.db.is_url_duplicate(stock_id, url): return False 
+        if self.db.is_title_duplicate(stock_id, title): return False
+
+        base_content = self.scraper.clean_and_validate_content(content, description, title)
+
+        if not is_api:
+            if not base_content or len(base_content) < 150:
+                print(f"      ⏩ Skipped: Content too short for Scraper ({len(base_content) if base_content else 0} chars)")
+                return False
+        else:
+            if not base_content or len(base_content) < 20:
+                base_content = title
+
+        if self.ai.is_arabic(title + base_content):
+            is_valid, sentiment, final_content = self.ai.process_arabic(title, base_content)
+            if not is_valid: 
+                print(f"      🚫 AI: News marked as invalid/spam")
+                return False
+        else:
+            sentiment = self.ai.process_english(title, base_content)
+            final_content = base_content 
+
+        formatted_date = pub_date.isoformat() if hasattr(pub_date, 'isoformat') else str(pub_date)
+        data = {
+            "stock_id": stock_id, "title": title, "description": description[:500] if description else "", 
+            "content": final_content, "url": url, "source": source,
+            "sentiment_label": sentiment, "published_at": formatted_date
+        }
+        
+        self.db.insert_news(data)
+        
+        if send_alert: self.db.send_notification(symbol, title, url)
+        
+        print(f"      ✅ DB: Saved [{sentiment}] news for [{symbol}] from {source}")
+        return True 
+
+    def process_stocks(self, stocks_list):
+        driver = self.setup_stock_driver()
+        try:
+            print(f"\n{'='*50}\n🇪🇬 STOCK ENGINE: Processing {len(stocks_list)} items\n{'='*50}")
+            for stock in stocks_list:
+                symbol, name_ar, stock_id = stock['symbol'], stock['company_name_ar'], stock['id']
+                notified_this_run = False 
+                
+                encoded_query = self.build_smart_query(name_ar, symbol)
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ar&gl=EG&ceid=EG:ar"
+
+                print(f"\n🔎 [{symbol}] Scanning RSS...")
+                feed = feedparser.parse(rss_url)
+                
+                entries = feed.entries[:5]
+                print(f"   Found {len(feed.entries)} entries, taking top {len(entries)}")
+
+                for entry in entries:
+                    title = entry.title
+                    print(f"\n   📰 Title: {title[:60]}...")
+                    
+                    fresh, pub_date = self.is_fresh_news(entry, max_days=3)
+                    if not fresh:
+                        print(f"      ⏩ Skipped: Too old ({pub_date})")
+                        continue
+
+                    if self.scraper.is_blacklisted(entry.link, title):
+                        print(f"      ⏩ Skipped: Blacklisted domain")
+                        continue
+
+                    if self.db.is_title_duplicate(stock_id, title):
+                        print(f"      🚫 Skipped: Duplicate title detected in DB")
+                        continue
+
+                    print(f"      🚀 Resolving URL with Selenium...")
+                    final_url = self.resolve_url_with_selenium(entry.link, driver)
+                    print(f"      🔗 Final URL: {final_url[:50]}...")
+
+                    content = None
+                    rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
+
+                    try:
+                        print(f"      📥 Attempting Trafilatura...")
+                        downloaded = trafilatura.fetch_url(final_url)
+                        if downloaded:
+                            content = trafilatura.extract(downloaded, include_formatting=True, include_links=False)
+                    except Exception as e:
+                        print(f"      ⚠️ Trafilatura Error: {e}")
+
+                    if not content or len(content) < 400:
+                        try:
+                            content = self.scraper.extract_smart_content(final_url, driver.page_source)
+                        except Exception as e: 
+                            print(f"      ⚠️ Smart Extraction Error: {e}")
+
+                    is_saved = self.process_and_save_news(
+                        stock_id, symbol, title, rss_desc, content, final_url, "Google News", pub_date, 
+                        is_api=False, send_alert=not notified_this_run 
+                    )
+                    
+                    if is_saved: notified_this_run = True
+
+                time.sleep(random.uniform(2, 4))
+        finally:
+            print("\n🛑 Closing Chrome Driver...")
+            driver.quit()
+
+    def process_crypto(self, crypto_list):
+        print(f"\n{'='*50}\n💎 CRYPTO ENGINE: Check Top 5 Latest News Per Coin\n{'='*50}")
+        driver = self.setup_stock_driver()
+        session_processed_titles = [] 
+        
+        try:
+            for coin in crypto_list:
+                symbol = coin['symbol'].upper()
+                name_en = coin['company_name_en']
+                notified_this_run = False 
+                
+                query = f'"{name_en}" OR "{symbol}" AND (crypto OR market OR price) when:3d'
+                encoded_query = quote(query)
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+
+                print(f"\n🔎 [{symbol}] Scanning RSS...")
+                feed = feedparser.parse(rss_url)
+                
+                sorted_entries = sorted(feed.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
+                entries_to_check = sorted_entries[:5]
+                print(f"   Found {len(feed.entries)} entries, checking top {len(entries_to_check)} only.")
+                
+                for index, entry in enumerate(entries_to_check, start=1):
+                    title = entry.title
+                    link = entry.link
+                    
+                    print(f"   📰 Checking ({index}/5): {title[:50]}...")
+                    
+                    if self.scraper.is_blacklisted(link, title):
+                        print("      ⏩ Skipped: Blacklisted domain")
+                        continue 
+
+                    is_session_duplicate = False
+                    clean_new_title = re.sub(r'[^\w\s]', '', title).lower()
+                    for past_title in session_processed_titles:
+                        if SequenceMatcher(None, clean_new_title, past_title).ratio() > 0.80:
+                            is_session_duplicate = True
+                            break
+                            
+                    if is_session_duplicate:
+                        print("      🚫 Skipped: Found similar news in this session")
+                        continue
+                    
+                    fresh, pub_date = self.is_fresh_news(entry, max_days=3)
+                    if not fresh:
+                        print("      ⏩ Skipped: Too old")
+                        continue
+
+                    if self.db.is_title_duplicate(coin['id'], title):
+                        continue
+
+                    print("      🚀 Resolving URL...")
+                    final_url = self.resolve_url_with_selenium(link, driver)
+                    
+                    rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
+                    content_for_ai = f"{title}. {rss_desc}"
+
+                    is_saved = self.process_and_save_news(
+                        stock_id=coin['id'], symbol=symbol, title=title, description=rss_desc[:500], 
+                        content=content_for_ai, url=final_url, source="Google Crypto News", 
+                        pub_date=pub_date, is_api=True, send_alert=not notified_this_run 
+                    )
+                    
+                    if is_saved:
+                        session_processed_titles.append(clean_new_title)
+                        notified_this_run = True 
+                
+                time.sleep(random.uniform(1, 2))
+                
+        except Exception as e:
+            print(f"      🚨 Crypto Engine Error: {e}")
+        finally:
+            print("\n🛑 Closing Chrome Driver (Crypto)...")
+            driver.quit()
+
+    def run(self):
+        start_time = datetime.now()
+        print(f"🚀 Job Started: {start_time}")
+        try:
+            print("📥 Loading stocks from Supabase...")
+            all_stocks = self.db.get_all_stocks()
+            print(f"✅ Loaded {len(all_stocks)} items from DB")
+
+            crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
+            stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
+
+            if crypto: self.process_crypto(crypto)
+            if stocks: self.process_stocks(stocks)
+
+        except Exception as e: 
+            print(f"\n🚨 CRITICAL ERROR: {e}")
+        
+        end_time = datetime.now()
+        print(f"\n✅ Job Finished: {end_time}")
+        print(f"⏱️ Total Duration: {end_time - start_time}")
+
+if __name__ == "__main__":
+    bot = EGX360Bot()
+    bot.run()
