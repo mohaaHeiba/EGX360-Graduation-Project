@@ -1,0 +1,21 @@
+الاول متنساش اني نعمل ده
+صلاحيات الـ Shell Script: ملف run.sh لازم تديله صلاحية تشغيل بالأمر ده: chmod +x /home/ec2-user/aws_automation/stocks_scraper/run.sh.
+
+
+
+
+
+# 1. Check Market Status (Daily at 09:45 Sun-Thu)
+45 09 * * 0-4 /home/ec2-user/aws_automation/my_env/bin/python3 /home/ec2-user/aws_automation/market_status/market_status.py >> /home/ec2-user/aws_automation/market.log 2>&1
+
+# 2. Run Stocks Scraper (Every 30 mins between 10:00 and 15:00 Sun-Thu)
+*/30 10-15 * * 0-4 /bin/bash /home/ec2-user/aws_automation/stocks_scraper/run.sh >> /home/ec2-user/aws_automation/scraper.log 2>&1
+
+# 3. News Bot (Every hour, every day)
+0 * * * * /home/ec2-user/aws_automation/my_env/bin/python3 /home/ec2-user/aws_automation/news_bot/main.py >> /home/ec2-user/aws_automation/news.log 2>&1
+
+# 4. Prediction Model (Daily at 16:00 Sun-Thu after Market close)
+0 16 * * 0-4 /home/ec2-user/aws_automation/my_env/bin/python3 /home/ec2-user/aws_automation/prediction_models/predict.py >> /home/ec2-user/aws_automation/predict.log 2>&1
+
+# 5. Materials Pricing (Daily at 20:00)
+0 20 * * * /home/ec2-user/aws_automation/my_env/bin/python3 /home/ec2-user/aws_automation/materials_local_pricing/old_way_to_scraping_material.py >> /home/ec2-user/aws_automation/materials.log 2>&1
