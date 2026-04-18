@@ -6,11 +6,12 @@ import yfinance as yf
 from supabase import create_client, Client
 import warnings
 import os
+import requests  
 
 warnings.filterwarnings('ignore')
 
 # ==========================================
-# 1. إعدادات النظام (Configuration)
+# 1. Configuration
 # ==========================================
 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -20,19 +21,15 @@ load_dotenv(dotenv_path=env_path)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# مسار الموديل العام (Fallback)
 GENERAL_MODEL_PATH = "EGX360_Final_Model_v8.pkl"
 GENERAL_SCALER_PATH = "EGX360_Scaler_v8.pkl"
 
 # ==========================================
-# 2. الدوال المساعدة (Helper Functions)
+# 2. Helper Functions
 # ==========================================
 def fetch_macro_data():
-    """جلب بيانات الذهب والدولار مرة واحدة لتوفير وقت الـ Loop"""
     print("🌍 Fetching Global Macro Data (Gold & USD)...")
     try:
         gold = yf.download("GC=F", period="10d", interval="1d", progress=False)
@@ -43,10 +40,7 @@ def fetch_macro_data():
         return None, None
 
 def calculate_technical_features(df, gold_data, usd_data):
-    """محرك الحسابات الكمية (Quant Engine) لتجهيز الـ Features"""
-    # أ. معالجة الماكرو
     if gold_data is not None and not gold_data.empty and usd_data is not None and not usd_data.empty:
-        # استخدام float() لضمان استخراج الرقم بشكل صحيح وتجنب مشاكل MultiIndex في yfinance
         gold_ret = float(np.log(gold_data['Close'] / gold_data['Close'].shift(1)).iloc[-1])
         gold_vel = float((gold_data['Close'].pct_change().diff()).iloc[-1])
         gold_lag = float(np.log(gold_data['Close'] / gold_data['Close'].shift(1)).iloc[-2])
@@ -55,7 +49,6 @@ def calculate_technical_features(df, gold_data, usd_data):
     else:
         gold_ret = gold_vel = gold_lag = usd_ret = usd_vel = 0.0
 
-    # ب. معالجة الفنيات
     df['log_ret'] = np.log(df['close'] / df['close'].shift(1))
     df['price_velocity'] = df['log_ret'].diff()
     
@@ -75,17 +68,16 @@ def calculate_technical_features(df, gold_data, usd_data):
     df['day_sin'] = np.sin(2 * np.pi * df.index.dayofweek / 7)
     df['day_cos'] = np.cos(2 * np.pi * df.index.dayofweek / 7)
 
-    # ج. دمج المتغيرات
     df['log_ret_usd'] = usd_ret
     df['price_velocity_usd'] = usd_vel
     df['gold_log_ret'] = gold_ret
     df['gold_velocity'] = gold_vel
     df['gold_ret_lag1'] = gold_lag
     df['RVOL_50'] = 1.0 
-    df['Interest_Rate'] = 19.0 # الفائدة الحالية
+    df['Interest_Rate'] = 19.0 
     df['IR_Change'] = 0.0
 
-    # ترتيب الـ Features نفس اللي الموديل اتدرب عليه بالمللي
+    #  Features نفس اللي الموديل اتدرب عليه بالمللي
     features = [
         'log_ret', 'log_ret_usd', 'price_velocity', 'price_velocity_usd', 'RVOL_50', 
         'day_sin', 'day_cos', 'dist_EMA_9', 'dist_EMA_21', 'dist_EMA_50', 
@@ -96,7 +88,6 @@ def calculate_technical_features(df, gold_data, usd_data):
     return df[features].tail(1)
 
 def push_to_db(symbol, close_price, prob):
-    """رفع النتيجة النهائية لقاعدة البيانات"""
     data = {
         "symbol": symbol.upper(),
         "close_price": float(close_price),
@@ -109,10 +100,9 @@ def push_to_db(symbol, close_price, prob):
         print(f"   ❌ DB Push Failed: {e}")
 
 # ==========================================
-# 3. محركات المعالجة (Processing Engines)
+# 3. Processing Engines
 # ==========================================
 def predict_asset(df, symbol):
-    """تحميل الموديل المناسب وتوقع الاتجاه"""
     specific_model = f"{symbol}_Model_v8.pkl"
     specific_scaler = f"{symbol}_Scaler_v8.pkl"
     
@@ -130,7 +120,6 @@ def predict_asset(df, symbol):
             return None
             
     try:
-        # إرسال DataFrame كامل للمحافظة على أسامي الـ Features
         scaled_data = scaler.transform(df)
         prob = model.predict_proba(scaled_data)[0][1]
         return prob
@@ -139,12 +128,10 @@ def predict_asset(df, symbol):
         return None
 
 def process_egx(stock_info, gold, usd):
-    """معالجة الأسهم المصرية والمؤشرات من Supabase"""
     symbol = stock_info['symbol']
     table_name = stock_info['candle_table_name']
     print(f"\n🔄 [EGX] Processing {symbol}...")
 
-    # سحب الداتا من Supabase
     response = supabase.table(table_name).select("*").eq("timeframe", "1d").order("timestamp", desc=True).limit(100).execute()
     if not response.data:
         print(f"   ❌ No 1D data found in {table_name}")
@@ -163,25 +150,38 @@ def process_egx(stock_info, gold, usd):
         push_to_db(symbol, close_price, prob)
 
 def process_crypto(stock_info, gold, usd):
-    """معالجة العملات الرقمية من Yahoo Finance"""
     symbol = stock_info['symbol']
-    yf_symbol = f"{symbol}-USD"
-    print(f"\n🔄 [CRYPTO] Processing {symbol} via yfinance...")
+    binance_symbol = f"{symbol}USDT"
+    print(f"\n🔄 [CRYPTO] Processing {symbol} via Binance API...")
 
     try:
-        df = yf.download(yf_symbol, period="100d", interval="1d", progress=False)
-        if df.empty:
-            print(f"   ❌ No data found for {yf_symbol}")
+        url = "https://api.binance.com/api/v3/klines"
+        params = {
+            "symbol": binance_symbol,
+            "interval": "1d",
+            "limit": 100
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        
+        if not data or isinstance(data, dict):
+            print(f"   ❌ No data found for {binance_symbol} on Binance")
             return
             
-        # توحيد أسماء الأعمدة لتطابق توقعات الموديل
-        df.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'}, inplace=True)
-        # إزالة الـ MultiIndex لو yfinance رجعه
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        df = pd.DataFrame(data, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'close_time', 'quote_asset_volume', 'number_of_trades',
+            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+        ])
+        
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('timestamp', inplace=True)
+        
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            df[col] = df[col].astype(float)
             
     except Exception as e:
-        print(f"   ❌ Failed to fetch Crypto data: {e}")
+        print(f"   ❌ Failed to fetch Crypto data from Binance: {e}")
         return
 
     close_price = float(df['close'].iloc[-1])
@@ -192,12 +192,11 @@ def process_crypto(stock_info, gold, usd):
         push_to_db(symbol, close_price, prob)
 
 # ==========================================
-# 4. نقطة الانطلاق (Main Pipeline)
+# 4. Main Pipeline
 # ==========================================
 if __name__ == "__main__":
     print("🚀 EGX360 AI Engine Started...\n" + "="*40)
     
-    # سحب كل الرموز من الداتابيز
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
     stocks = response.data
     
