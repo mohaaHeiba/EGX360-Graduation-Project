@@ -1,4 +1,6 @@
 from dotenv import load_dotenv
+from firebase_admin import credentials, messaging
+import firebase_admin
 import pandas as pd
 import numpy as np
 import joblib
@@ -16,6 +18,8 @@ warnings.filterwarnings('ignore')
 
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 
+SERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), '..', 'service_account.json')
+
 load_dotenv(dotenv_path=env_path)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -23,8 +27,14 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+if not firebase_admin._apps:
+    cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
+    firebase_admin.initialize_app(cred)
+
+
 GENERAL_MODEL_PATH = "EGX360_Final_Model_v8.pkl"
 GENERAL_SCALER_PATH = "EGX360_Scaler_v8.pkl"
+
 
 # ==========================================
 # 2. Helper Functions
@@ -32,13 +42,13 @@ GENERAL_SCALER_PATH = "EGX360_Scaler_v8.pkl"
 def fetch_macro_data():
     print("🌍 Fetching Global Macro Data (Gold & USD)...")
     try:
-        # استخدام Ticker.history بيرجع Dataframe بسيطة ومفيهاش مشكلة الأعمدة المزدوجة
         gold = yf.Ticker("GC=F").history(period="10d", interval="1d")
         usd = yf.Ticker("EGP=X").history(period="10d", interval="1d")
         return gold, usd
     except Exception as e:
         print(f"⚠️ Failed to fetch macro data: {e}")
         return None, None
+
 def calculate_technical_features(df, gold_data, usd_data):
     if gold_data is not None and not gold_data.empty and usd_data is not None and not usd_data.empty:
         gold_ret = float(np.log(gold_data['Close'] / gold_data['Close'].shift(1)).iloc[-1])
@@ -77,7 +87,6 @@ def calculate_technical_features(df, gold_data, usd_data):
     df['Interest_Rate'] = 19.0 
     df['IR_Change'] = 0.0
 
-    #  Features نفس اللي الموديل اتدرب عليه بالمللي
     features = [
         'log_ret', 'log_ret_usd', 'price_velocity', 'price_velocity_usd', 'RVOL_50', 
         'day_sin', 'day_cos', 'dist_EMA_9', 'dist_EMA_21', 'dist_EMA_50', 
@@ -127,6 +136,43 @@ def predict_asset(df, symbol):
         print(f"   ❌ Prediction Error: {e}")
         return None
 
+def send_prediction_alert(symbol, current_price, prob):
+    HIGH_THRESHOLD = 0.80  
+    LOW_THRESHOLD = 0.20   
+
+    if prob >= HIGH_THRESHOLD:
+        display_title = f"🚀 Strong Signal: {symbol}"
+        display_body = f"Model predicts an uptrend! Current Price: {current_price:,.2f}, Probability: {prob:.0%}"
+        icon = "🚀"
+    elif prob <= LOW_THRESHOLD:
+        display_title = f"⚠️ Downtrend Warning: {symbol}"
+        display_body = f"High probability of a downtrend. Current Price: {current_price:,.2f}, Uptrend Probability: {prob:.0%}"
+        icon = "⚠️"
+    else:
+        return 
+
+    try:
+        res = supabase.table("user_watchlist").select("profiles(fcm_token)").eq("stock_symbol", symbol).execute()
+        tokens = list(set([i['profiles']['fcm_token'] for i in res.data if i.get('profiles') and i['profiles'].get('fcm_token')]))
+        
+        if not tokens: 
+            return
+
+        message = messaging.MulticastMessage(
+            notification=messaging.Notification(title=display_title, body=display_body),
+            android=messaging.AndroidConfig(
+                priority='high', 
+                notification=messaging.AndroidNotification(channel_id='ai_predictions_alerts')
+            ),
+            data={'type': 'ai_alert', 'symbol': symbol},
+            tokens=tokens
+        )
+        messaging.send_each_for_multicast(message)
+        print(f"   🔔 Alert Sent for {symbol} to {len(tokens)} users: {icon} {prob:.0%}")
+        
+    except Exception as e:
+        print(f"   ❌ FCM Alert Error for {symbol}: {e}")
+
 def process_egx(stock_info, gold, usd):
     symbol = stock_info['symbol']
     table_name = stock_info['candle_table_name']
@@ -148,6 +194,7 @@ def process_egx(stock_info, gold, usd):
     prob = predict_asset(input_data, symbol)
     if prob is not None:
         push_to_db(symbol, close_price, prob)
+        send_prediction_alert(symbol, close_price, prob)
 
 def process_crypto(stock_info, gold, usd):
     symbol = stock_info['symbol']
@@ -190,6 +237,7 @@ def process_crypto(stock_info, gold, usd):
     prob = predict_asset(input_data, symbol)
     if prob is not None:
         push_to_db(symbol, close_price, prob)
+        send_prediction_alert(symbol, close_price, prob)
 
 # ==========================================
 # 4. Main Pipeline
