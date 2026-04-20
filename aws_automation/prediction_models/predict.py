@@ -32,13 +32,13 @@ GENERAL_SCALER_PATH = "EGX360_Scaler_v8.pkl"
 def fetch_macro_data():
     print("🌍 Fetching Global Macro Data (Gold & USD)...")
     try:
-        gold = yf.download("GC=F", period="10d", interval="1d", progress=False)
-        usd = yf.download("EGP=X", period="10d", interval="1d", progress=False)
+        # استخدام Ticker.history بيرجع Dataframe بسيطة ومفيهاش مشكلة الأعمدة المزدوجة
+        gold = yf.Ticker("GC=F").history(period="10d", interval="1d")
+        usd = yf.Ticker("EGP=X").history(period="10d", interval="1d")
         return gold, usd
     except Exception as e:
         print(f"⚠️ Failed to fetch macro data: {e}")
         return None, None
-
 def calculate_technical_features(df, gold_data, usd_data):
     if gold_data is not None and not gold_data.empty and usd_data is not None and not usd_data.empty:
         gold_ret = float(np.log(gold_data['Close'] / gold_data['Close'].shift(1)).iloc[-1])
