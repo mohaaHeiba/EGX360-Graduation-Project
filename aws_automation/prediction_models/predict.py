@@ -32,8 +32,8 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 
 
-GENERAL_MODEL_PATH = "EGX360_Final_Model_v8.pkl"
-GENERAL_SCALER_PATH = "EGX360_Scaler_v8.pkl"
+GENERAL_MODEL_PATH = "/home/heiba/EGX360_Graduation_Project/aws_automation/prediction_models/EGX360_Final_Model_v8.pkl"
+GENERAL_SCALER_PATH = "/home/heiba/EGX360_Graduation_Project/aws_automation/prediction_models/EGX360_Scaler_v8.pkl"
 
 
 # ==========================================
