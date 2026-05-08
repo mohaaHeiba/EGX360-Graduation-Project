@@ -10,7 +10,7 @@ print("Loading EGX30 local data...")
 
 print(" Loading Daily Data")
 current_dir = os.getcwd()
-file_path = os.path.join(current_dir, "data", "EGX30_1D.csv")
+file_path = os.path.join(current_dir, "data", "egx30_1d_data.csv")
 print(f"File path: {file_path}")
 df = pd.read_csv(file_path)
 

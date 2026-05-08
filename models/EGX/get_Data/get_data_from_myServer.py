@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from supabase import create_client, Client
 
@@ -23,7 +24,7 @@ def fetch_all_data(table_name):
         data = response.data
         all_data.extend(data)
         
-        # لو الداتا اللي رجعت أقل من 1000، يبقى خلصنا الجدول
+        # لو الداتا اللي رجعت أقل من page_size، يبقى خلصنا الجدول
         if len(data) < page_size:
             break
         
@@ -33,19 +34,47 @@ def fetch_all_data(table_name):
     # تحويل البيانات لـ DataFrame
     df = pd.DataFrame(all_data)
     
-    # تظبيط صيغة الوقت لو الجدول مش فاضي
     if not df.empty:
+        # تظبيط صيغة الوقت للـ timestamp فقط
         df['timestamp'] = pd.to_datetime(df['timestamp'])
-        df['created_at'] = pd.to_datetime(df['created_at'])
+            
+        # ==========================================
+        # خطوة الترتيب (Sorting)
+        # ==========================================
+        print(f"جاري ترتيب بيانات {table_name} زمنيًا من الأقدم للأحدث...")
+        df.sort_values(by='timestamp', ascending=True, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        
+        # ==========================================
+        # مسح الأعمدة غير المطلوبة
+        # ==========================================
+        print("جاري حذف أعمدة timeframe و created_at...")
+        df.drop(columns=['timeframe', 'created_at'], errors='ignore', inplace=True)
     
     return df
 
+# ==========================================
+# إعداد مسار الحفظ وإنشاء الفولدر لو مش موجود
+# ==========================================
+
+# تحديد مسار فولدر data 
+save_dir = "data"
+
+# السطر ده هيكريت فولدر data أوتوماتيك لو مش موجود عشان ميضربش إيرور
+os.makedirs(save_dir, exist_ok=True)
+
+# ==========================================
+# سحب وحفظ البيانات
+# ==========================================
+
 # سحب وحفظ بيانات الجدول الأول
 df_30 = fetch_all_data("egx30_candles")
-df_30.to_csv("EGX/data/egx30_1d_data.csv", index=False)
-print(f"✅ خلصنا! تم حفظ {len(df_30)} صف في ملف: egx30_1d_data.csv")
+save_path_30 = os.path.join(save_dir, "egx30_1d_data.csv")
+df_30.to_csv(save_path_30, index=False)
+print(f"✅ خلصنا! تم حفظ {len(df_30)} صف مترتبين ومتنضفين في ملف: {save_path_30}")
 
 # سحب وحفظ بيانات الجدول التاني
 df_70 = fetch_all_data("egx70ewi_candles")
-df_70.to_csv("EGX/data/egx70ewi_1d_data.csv", index=False)
-print(f"✅ خلصنا! تم حفظ {len(df_70)} صف في ملف: egx70ewi_1d_data.csv")
+save_path_70 = os.path.join(save_dir, "egx70ewi_1d_data.csv")
+df_70.to_csv(save_path_70, index=False)
+print(f"✅ خلصنا! تم حفظ {len(df_70)} صف مترتبين ومتنضفين في ملف: {save_path_70}")
