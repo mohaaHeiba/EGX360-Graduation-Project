@@ -34,8 +34,8 @@
         "dist_EMA_20": 0.020392,
         "EMA_21": 50640.348712,
         "dist_EMA_21": 0.02213,
-        "EMA_32": 49882.929047,
-        "dist_EMA_32": 0.03765,
+        "EMA_31": 49941.390859,
+        "dist_EMA_31": 0.036435,
         "EMA_50": 48962.746066,
         "dist_EMA_50": 0.057151,
         "below_EMA9": 1.0,
@@ -74,7 +74,7 @@
     },
     "ml_prediction": {
         "signal": "UP",
-        "confidence_percentage": 93.47,
+        "confidence_percentage": 94.82,
         "model_version": "EGX360_Deep_Quant_v8.4"
     }
 }
