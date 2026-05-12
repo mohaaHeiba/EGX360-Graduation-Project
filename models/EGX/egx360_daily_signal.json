@@ -74,7 +74,15 @@
     },
     "ml_prediction": {
         "signal": "UP",
-        "confidence_percentage": 94.82,
+        "confidence_percentage": 63.75,
         "model_version": "EGX360_Deep_Quant_v8.4"
+    },
+    "backtest_results": {
+        "initial_capital": 10000.0,
+        "final_strategy_value": 60036.28,
+        "final_market_value": 46838.72,
+        "strategy_profit_pct": 500.36,
+        "market_profit_pct": 368.39,
+        "outperformance_pct": 131.98
     }
 }
