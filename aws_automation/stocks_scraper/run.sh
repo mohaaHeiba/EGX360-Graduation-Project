@@ -1,41 +1,19 @@
-
 #!/bin/bash
 
-cd /home/ubuntu/stocks_scraper
+# Navigate to the project directory
+cd "$(dirname "$0")"
 
-source venv/bin/activate 2>/dev/null || echo " No virtualenv found, continuing..."
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    source venv/bin/activate
+elif [ -d "../venv" ]; then
+    source ../venv/bin/activate
+fi
 
+echo "🚀 Starting EGX Centralized Market Engine..."
 
-python3 -m egx_candles.abuk_candle &
-sleep 5
-python -m egx_candles.comi_candle &
-sleep 5
-python -m egx_candles.east_candle &
- sleep 5
-  python -m egx_candles.efih_candle &
-  sleep 5
-  python -m egx_candles.emfd_candle &
-  sleep 5
-  python -m egx_candles.etel_candle &
-  sleep 5
-  python -m egx_candles.expa_candle &
-  sleep 5
-  python -m egx_candles.fwry_candle &
-  sleep 5
-  python -m egx_candles.hrho_candle &
-  sleep 5
-  python -m egx_candles.iron_candle &
-  sleep 5
-  python -m egx_candles.oras_candle &
-  sleep 5
-  python -m egx_candles.swdy_candle &
-  sleep 5
-  python -m egx_candles.tmgh_candle &
-  sleep 5
-  python -m egx_candles.egx30_candle &
-  sleep 5
-  python -m egx_candles.egx70ewi_candle &
+# Run the centralized engine
+# We use python3 -u for unbuffered output to ensure logs are visible immediately
+python3 -u centralized_engine.py
 
-echo " All EGX candle scripts are running in the background!"
-
-wait
+echo "🛑 Engine stopped."

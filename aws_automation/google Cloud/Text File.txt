@@ -1,0 +1,5 @@
+gcloud compute ssh egx360automation
+
+
+
+gcloud compute scp --recurse /path/to/your/scripts egx360automation:~/

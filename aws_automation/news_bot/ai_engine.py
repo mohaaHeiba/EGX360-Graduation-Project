@@ -16,9 +16,10 @@ class AIEngine:
 
     def process_arabic(self, title, content):
         prompt = f"""
-        أنت آلة برمجية صارمة لتنظيف وتصنيف البيانات. لا تمتلك آراء شخصية. لا تقم بكتابة أي مقدمات أو نهايات أو تحليلات.
+        أنت آلة برمجية صارمة لتنظيف وتصنيف البيانات الاقتصادية. لا تمتلك آراء شخصية. لا تقم بكتابة أي مقدمات أو نهايات أو تحليلات.
         مهمتك محددة في 3 نقاط فقط:
-        1. VALID: هل النص يمثل خبر مقروء ومفهوم؟ (True/False). إذا كان النص عبارة عن حروف عشوائية، أو بيانات ملتصقة ببعضها (مثل: كودالترقيمالشركة)، أو لا يحمل معنى، اكتب False.
+        1. VALID: هل النص يمثل خبر مقروء ومفهوم ومتعلق حصرياً بالاقتصاد، البورصة، الأسهم، أو أخبار الشركات؟ (True/False).
+           يجب أن تكتب False إذا كان الخبر متعلقاً بـ: الرياضة (مثل كرة القدم، الأندية)، الفن، الحوادث، أو أي موضوع غير مالي.
         2. SENTIMENT: صنف الخبر (Positive أو Negative أو Neutral).
         3. TEXT: أعد كتابة النص الأصلي كما هو تماماً، ولكن احذف منه فقط (الإعلانات، الروابط، الكلمات المفتاحية، جمل مثل "اقرأ أيضا"). 
         
@@ -38,7 +39,7 @@ class AIEngine:
         try:
             response = self.cerebras_client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "You are a strict data extraction machine. ONLY output the requested format. NEVER add opinions, summaries, or conversational text."},
+                    {"role": "system", "content": "You are a strict data extraction machine for financial news. ONLY output the requested format. NEVER add opinions, summaries, or conversational text."},
                     {"role": "user", "content": prompt}
                 ],
                 model="llama3.1-8b",
@@ -62,10 +63,58 @@ class AIEngine:
                 
             return True, "Neutral", content
         except Exception as e:
-            print(f"      ⚠️ Cerebras Error: {e}")
+            print(f"      ⚠️ Cerebras Arabic Error: {e}")
+            return True, "Neutral", content
+
+    def process_english_llm(self, title, content):
+        prompt = f"""
+        You are a strict data extraction machine for financial news. No personal opinions. No introductions or conversational text.
+        Your task is strictly limited to 3 points:
+        1. VALID: Is the text a readable news item and EXCLUSIVELY related to economy, stock market, stocks, or corporate news? (True/False).
+           Write False if the news is about: Sports (e.g., football/soccer, teams), Art/Entertainment, General accidents, or any non-financial topic.
+        2. SENTIMENT: Classify the news (Positive, Negative, or Neutral).
+        3. TEXT: Rewrite the original text exactly as it is, but REMOVE only (ads, links, keywords, phrases like "Read also").
+        
+        STRICT WARNING: Do NOT add any opinion, analysis, or summary. The cleaned text must match the original without the advertising clutter.
+        
+        Original News:
+        Title: {title}
+        Content: {str(content)[:2500]}
+        
+        Response MUST be exclusively inside this template:
+        [START]
+        VALID: <True or False>
+        SENTIMENT: <Positive or Negative or Neutral>
+        TEXT: <The full cleaned text here>
+        [END]
+        """
+        try:
+            response = self.cerebras_client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "You are a strict financial data extraction machine. ONLY output the requested format."},
+                    {"role": "user", "content": prompt}
+                ],
+                model="llama3.1-8b",
+                temperature=0.01,
+                max_tokens=3000
+            )
+            raw_text = response.choices[0].message.content
+            block = re.search(r'\[START\](.*?)\[END\]', raw_text, re.DOTALL)
+            if block:
+                data = block.group(1)
+                valid_str = re.search(r'VALID:\s*(.+)', data).group(1).strip()
+                sentiment = re.search(r'SENTIMENT:\s*(.+)', data).group(1).strip().capitalize()
+                text_match = re.search(r'TEXT:\s*(.*)', data, re.DOTALL)
+                is_valid = True if 'True' in valid_str else False
+                clean_text = text_match.group(1).strip() if text_match else content
+                return is_valid, sentiment, clean_text
+            return True, "Neutral", content
+        except Exception as e:
+            print(f"      ⚠️ Cerebras English Error: {e}")
             return True, "Neutral", content
 
     def process_english(self, title, content):
+        # Fallback to FinBERT if LLM fails or for sentiment only if needed
         text_to_analyze = f"{title}. {content}"
         try:
             result = self.finbert(text_to_analyze)[0]

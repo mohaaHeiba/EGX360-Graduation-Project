@@ -1,0 +1,34 @@
+# EGX360 Graduation Project Dependencies
+# Target Environment: Linux (Ubuntu), Python 3.10+
+
+# --- Data Science & Machine Learning ---
+pandas
+numpy
+scikit-learn
+joblib
+yfinance
+
+# --- AI & NLP (FinBERT & Cerebras) ---
+transformers
+torch
+cerebras-cloud-sdk
+
+# --- Database & Cloud Integration ---
+supabase
+firebase-admin
+python-dotenv
+
+# --- Web Scraping & Market Data ---
+requests
+beautifulsoup4
+cloudscraper
+feedparser
+trafilatura
+selenium
+webdriver-manager
+undetected-chromedriver
+python-dateutil
+tvdatafeed
+
+# --- Utilities ---
+pytz

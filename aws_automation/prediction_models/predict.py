@@ -123,9 +123,9 @@ def predict_and_generate_payload(df, symbol):
         expected_features = [
             'log_ret', 'price_velocity', 'log_ret_usd', 'price_velocity_usd', 'log_ret_usd_lag1', 
             'gold_log_ret', 'gold_velocity', 'gold_ret_lag1', 'Volume_SMA_50', 'RVOL_50', 
-            'day_sin', 'day_cos', 'EMA_9', 'dist_EMA_9', 'EMA_10', 'dist_EMA_10', 
-            'EMA_20', 'dist_EMA_20', 'EMA_21', 'dist_EMA_21', 'EMA_31', 'dist_EMA_31', 
-            'EMA_50', 'dist_EMA_50', 'below_EMA9', 'EMA_Spread', 'EMA_Cross_Signal', 
+            'day_sin', 'day_cos', 'dist_EMA_9', 'dist_EMA_10', 
+            'dist_EMA_20', 'dist_EMA_21', 'dist_EMA_31', 
+            'dist_EMA_50', 'below_EMA9', 'EMA_Spread', 'EMA_Cross_Signal', 
             'RSI', 'RSI_diff', 'MACD_Hist', 'ATR_pct', 'BB_Width', 'log_ret_lag1', 
             'RSI_lag1', 'USD_Shock', 'Rate_Hike_Flag', 'Rate_Drop_Flag', 'Composite_Momentum', 
             'gold_usd', 'Interest_Rate', 'IR_Change'

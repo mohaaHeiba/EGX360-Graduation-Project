@@ -46,9 +46,18 @@ class EGX360Bot:
             return driver.current_url
         except: return google_url
 
-    def build_smart_query(self, company_name, symbol):
+    def build_smart_query(self, company_name, symbol, lang='ar'):
         clean_name = company_name.replace("المصرية", "").replace("القابضة", "").strip()
-        query = f'"{clean_name}" AND (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) when:5d'
+        
+        # Negative keywords to exclude sports/football
+        neg_ar = "-كرة -قدم -رياضة -مباراة -لاعب -نادي -دوري -كأس -بطولة"
+        neg_en = "-football -soccer -sports -match -player -club -league -cup -tournament"
+        
+        if lang == 'ar':
+            query = f'"{clean_name}" AND (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) {neg_ar} when:5d'
+        else:
+            query = f'"{clean_name}" OR "{symbol}" AND (stock OR market OR finance OR earnings OR trading) {neg_en} when:5d'
+            
         return quote(query)
 
     def is_fresh_news(self, entry, max_days=3):
@@ -79,13 +88,12 @@ class EGX360Bot:
 
         if self.ai.is_arabic(title + base_content):
             is_valid, sentiment, final_content = self.ai.process_arabic(title, base_content)
-            if not is_valid: 
-                print(f"      🚫 AI: News marked as invalid/spam")
-                return False
         else:
-            sentiment = self.ai.process_english(title, base_content)
-            final_content = base_content 
+            is_valid, sentiment, final_content = self.ai.process_english_llm(title, base_content)
 
+        if not is_valid: 
+            print(f"      🚫 AI: News marked as invalid or irrelevant (e.g. sports/spam)")
+            return False
         formatted_date = pub_date.isoformat() if hasattr(pub_date, 'isoformat') else str(pub_date)
         data = {
             "stock_id": stock_id, "title": title, "description": description[:500] if description else "", 
@@ -113,64 +121,71 @@ class EGX360Bot:
                 symbol, name_ar, stock_id = stock['symbol'], stock['company_name_ar'], stock['id']
                 notified_this_run = False 
                 
-                encoded_query = self.build_smart_query(name_ar, symbol)
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ar&gl=EG&ceid=EG:ar"
+                # Search both Arabic and English sources
+                search_configs = [
+                    {'lang': 'ar', 'hl': 'ar', 'gl': 'EG', 'ceid': 'EG:ar', 'label': 'Google News (AR)'},
+                    {'lang': 'en', 'hl': 'en', 'gl': 'US', 'ceid': 'US:en', 'label': 'Google News (EN)'}
+                ]
 
-                print(f"\n🔎 [{symbol}] Scanning RSS...")
-                feed = feedparser.parse(rss_url)
-                
-                entries = feed.entries[:5]
-                print(f"   Found {len(feed.entries)} entries, taking top {len(entries)}")
+                for config in search_configs:
+                    encoded_query = self.build_smart_query(name_ar, symbol, lang=config['lang'])
+                    rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl={config['hl']}&gl={config['gl']}&ceid={config['ceid']}"
 
-                for entry in entries:
-                    title = entry.title
-                    print(f"\n   📰 Title: {title[:60]}...")
+                    print(f"\n🔎 [{symbol}] Scanning RSS ({config['label']})...")
+                    feed = feedparser.parse(rss_url)
                     
-                    fresh, pub_date = self.is_fresh_news(entry, max_days=3)
-                    if not fresh:
-                        print(f"      ⏩ Skipped: Too old ({pub_date})")
-                        continue
+                    entries = feed.entries[:3]
+                    print(f"   Found {len(feed.entries)} entries, taking top {len(entries)}")
 
-                    if self.scraper.is_blacklisted(entry.link, title):
-                        print(f"      ⏩ Skipped: Blacklisted domain")
-                        continue
+                    for entry in entries:
+                        title = entry.title
+                        print(f"\n   📰 Title: {title[:60]}...")
+                        
+                        fresh, pub_date = self.is_fresh_news(entry, max_days=3)
+                        if not fresh:
+                            print(f"      ⏩ Skipped: Too old ({pub_date})")
+                            continue
 
-                    if self.db.is_title_duplicate(stock_id, title):
-                        print(f"      🚫 Skipped: Duplicate title detected in DB")
-                        continue
+                        if self.scraper.is_blacklisted(entry.link, title):
+                            print(f"      ⏩ Skipped: Blacklisted domain")
+                            continue
 
-                    print(f"      🚀 Resolving URL with Selenium...")
-                    final_url = self.resolve_url_with_selenium(entry.link, driver)
-                    print(f"      🔗 Final URL: {final_url[:50]}...")
+                        if self.db.is_title_duplicate(stock_id, title):
+                            print(f"      🚫 Skipped: Duplicate title detected in DB")
+                            continue
 
-                    if self.scraper.is_blacklisted(final_url, title):
-                        print(f"      ⏩ Skipped: Blacklisted domain (After Resolving)")
-                        continue
+                        print(f"      🚀 Resolving URL with Selenium...")
+                        final_url = self.resolve_url_with_selenium(entry.link, driver)
+                        print(f"      🔗 Final URL: {final_url[:50]}...")
 
-                    
-                    content = None
-                    rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
+                        if self.scraper.is_blacklisted(final_url, title):
+                            print(f"      ⏩ Skipped: Blacklisted domain (After Resolving)")
+                            continue
 
-                    try:
-                        print(f"      📥 Attempting Trafilatura...")
-                        downloaded = trafilatura.fetch_url(final_url)
-                        if downloaded:
-                            content = trafilatura.extract(downloaded, include_formatting=True, include_links=False)
-                    except Exception as e:
-                        print(f"      ⚠️ Trafilatura Error: {e}")
+                        
+                        content = None
+                        rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
 
-                    if not content or len(content) < 400:
                         try:
-                            content = self.scraper.extract_smart_content(final_url, driver.page_source)
-                        except Exception as e: 
-                            print(f"      ⚠️ Smart Extraction Error: {e}")
+                            print(f"      📥 Attempting Trafilatura...")
+                            downloaded = trafilatura.fetch_url(final_url)
+                            if downloaded:
+                                content = trafilatura.extract(downloaded, include_formatting=True, include_links=False)
+                        except Exception as e:
+                            print(f"      ⚠️ Trafilatura Error: {e}")
 
-                    is_saved = self.process_and_save_news(
-                        stock_id, symbol, title, rss_desc, content, final_url, "Google News", pub_date, 
-                        is_api=False, send_alert=not notified_this_run 
-                    )
-                    
-                    if is_saved: notified_this_run = True
+                        if not content or len(content) < 400:
+                            try:
+                                content = self.scraper.extract_smart_content(final_url, driver.page_source)
+                            except Exception as e: 
+                                print(f"      ⚠️ Smart Extraction Error: {e}")
+
+                        is_saved = self.process_and_save_news(
+                            stock_id, symbol, title, rss_desc, content, final_url, config['label'], pub_date, 
+                            is_api=False, send_alert=not notified_this_run 
+                        )
+                        
+                        if is_saved: notified_this_run = True
 
                 time.sleep(random.uniform(2, 4))
         finally:
