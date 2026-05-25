@@ -25,11 +25,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_stocks_metadata():
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
-    return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API']
+    return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API' or 'API_FINNHUB' and s['sector'] not in ['Crypto', 'Materials','US Stocks','US ETFs']]
 # ==============================================================================================================================
 
 TIMEFRAME_LABEL = "1d"
-start_date = datetime.date(2026, 4, 22)
+start_date = datetime.date(2026, 5, 16)
 end_date = datetime.date.today()
 date_range = pd.date_range(start=start_date, end=end_date)
 

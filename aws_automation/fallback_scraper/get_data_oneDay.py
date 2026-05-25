@@ -33,7 +33,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Get only stocks EG
 def get_egx_stocks():
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
-    return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API' and s['sector'] not in ['Crypto', 'Materials']]
+    return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API' or 'API_FINNHUB' and s['sector'] not in ['Crypto', 'Materials','US Stocks','US ETFs']]
 
 #==============================================================================================================================
 # Time
@@ -42,7 +42,7 @@ TIMEFRAME_LABEL = "1m"
 START_TIME = datetime.time(10, 0)
 END_TIME = datetime.time(14, 30)
 
-start_date = datetime.date(2026,4 , 22)
+start_date = datetime.date(2026,5 , 16)
 end_date = datetime.date.today()
 
 all_days = pd.date_range(start=start_date, end=end_date)

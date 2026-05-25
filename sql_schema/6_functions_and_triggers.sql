@@ -457,3 +457,46 @@ BEGIN
     VALUES (p_user_id, p_symbol, p_type, p_quantity, p_price, v_total_cost);
 END;
 $$;
+
+
+
+
+CREATE OR REPLACE FUNCTION public.get_latest_ai_prediction(p_symbol TEXT)
+RETURNS TABLE (
+    symbol VARCHAR,
+    company_name_ar VARCHAR,
+    company_name_en VARCHAR,
+    sector VARCHAR,
+    close_price NUMERIC,
+    probability NUMERIC,
+    overall_trend VARCHAR,
+    ml_signal VARCHAR,
+    volatility_status VARCHAR,
+    macd_status VARCHAR,
+    momentum_status VARCHAR,
+    atr_pct FLOAT8,
+    prediction_date DATE
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.symbol,
+        s.company_name_ar,
+        s.company_name_en,
+        s.sector,
+        p.close_price,
+        p.probability,
+        p.overall_trend,
+        p.ml_signal,
+        p.volatility_status,
+        p.macd_status,
+        p.momentum_status,
+        p.atr_pct,
+        p.prediction_date
+    FROM public.ai_predictions p
+    JOIN public.stocks s ON p.symbol = s.symbol
+    WHERE p.symbol = UPPER(p_symbol)
+    ORDER BY p.prediction_date DESC, p.created_at DESC
+    LIMIT 1;
+END;
+$$;

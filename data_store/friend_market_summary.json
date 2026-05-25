@@ -1,0 +1,619 @@
+{
+    "top_3_gainers": [
+        {
+            "change_pct": 16.21,
+            "stock_info": {
+                "id": 74,
+                "sector": "Non-bank Financial Services",
+                "symbol": "CCAP",
+                "website": "https://www.qalaaholdings.com",
+                "logo_url": "https://drive.google.com/thumbnail?id=1MQuAPpK9J9C0YAFHaaYCiEFLuVB6UAgE&sz=w1000",
+                "isin_code": "EGS69081C018",
+                "prev_close": 4.75,
+                "description": "شركة استثمار مباشر تستثمر في البنية التحتية والصناعة.",
+                "listing_date": "2009-12-23",
+                "total_shares": null,
+                "company_name_ar": "القلعة للاستشارات المالية",
+                "company_name_en": "Qalaa Holdings"
+            },
+            "last_7_ohlc": [
+                {
+                    "low": 5.52,
+                    "high": 5.52,
+                    "open": 5.52,
+                    "close": 5.52,
+                    "volume": 75,
+                    "timestamp": "2026-05-17T11:46:00+00:00"
+                },
+                {
+                    "low": 5.53,
+                    "high": 5.53,
+                    "open": 5.53,
+                    "close": 5.53,
+                    "volume": 767073,
+                    "timestamp": "2026-05-17T11:45:00+00:00"
+                },
+                {
+                    "low": 5.53,
+                    "high": 5.53,
+                    "open": 5.53,
+                    "close": 5.53,
+                    "volume": 3782,
+                    "timestamp": "2026-05-17T11:44:00+00:00"
+                },
+                {
+                    "low": 5.52,
+                    "high": 5.52,
+                    "open": 5.52,
+                    "close": 5.52,
+                    "volume": 1071324,
+                    "timestamp": "2026-05-17T11:43:00+00:00"
+                },
+                {
+                    "low": 5.49,
+                    "high": 5.5,
+                    "open": 5.49,
+                    "close": 5.5,
+                    "volume": 200035,
+                    "timestamp": "2026-05-17T11:42:00+00:00"
+                },
+                {
+                    "low": 5.5,
+                    "high": 5.5,
+                    "open": 5.5,
+                    "close": 5.5,
+                    "volume": 16050,
+                    "timestamp": "2026-05-17T11:41:00+00:00"
+                },
+                {
+                    "low": 5.5,
+                    "high": 5.52,
+                    "open": 5.51,
+                    "close": 5.5,
+                    "volume": 313342,
+                    "timestamp": "2026-05-17T11:40:00+00:00"
+                }
+            ],
+            "latest_news": [
+                {
+                    "url": "https://sa.investing.com/news/analyst-ratings/article-93CH-3243663",
+                    "title": "بنشمارك تخفض هدف سعر سهم Hub Group بسبب تأخيرات محاسبية - Investing.com",
+                    "published_at": "2026-05-14T15:00:00+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://sa.investing.com/news/earnings/article-93CH-3243104",
+                    "title": "ارتفاع سهم enCore Energy بنسبة 3% بعد تجاوز التوقعات بأرباح الربع الأول - Investing.com",
+                    "published_at": "2026-05-14T11:57:00+00:00",
+                    "sentiment_label": "Positive"
+                },
+                {
+                    "url": "https://sa.investing.com/news/transcripts/article-93CH-3243087",
+                    "title": "ملخص مكالمة أرباح DLF: نتائج الربع الرابع 2026 تتجاوز توقعات ربحية السهم - Investing.com",
+                    "published_at": "2026-05-14T11:47:00+00:00",
+                    "sentiment_label": "Neutral"
+                }
+            ],
+            "latest_price": 5.52,
+            "ai_prediction": {
+                "ml_signal": "UP",
+                "probability": 0.9522522269555916,
+                "model_version": "EGX360_v8.4",
+                "overall_trend": "BULLISH",
+                "prediction_date": "2026-05-14"
+            },
+            "data_timestamp": "2026-05-17T11:46:00+00:00"
+        },
+        {
+            "change_pct": 8.03,
+            "stock_info": {
+                "id": 75,
+                "sector": "Technology",
+                "symbol": "RAYA",
+                "website": "https://www.rayacorp.com",
+                "logo_url": "https://drive.google.com/thumbnail?id=1Yw3dwnYXez2iSVG1b0Zs6nszdfkaHphu&sz=w1000",
+                "isin_code": "EGS69061C010",
+                "prev_close": 7.22,
+                "description": "تعمل في مجالات تكنولوجيا المعلومات ومراكز الاتصالات والتصنيع.",
+                "listing_date": "2005-05-18",
+                "total_shares": null,
+                "company_name_ar": "راية القابضة للاستثمارات",
+                "company_name_en": "Raya Holding"
+            },
+            "last_7_ohlc": [
+                {
+                    "low": 7.8,
+                    "high": 7.8,
+                    "open": 7.8,
+                    "close": 7.8,
+                    "volume": 100000,
+                    "timestamp": "2026-05-17T11:46:00+00:00"
+                },
+                {
+                    "low": 7.8,
+                    "high": 7.81,
+                    "open": 7.8,
+                    "close": 7.81,
+                    "volume": 3570,
+                    "timestamp": "2026-05-17T11:45:00+00:00"
+                },
+                {
+                    "low": 7.8,
+                    "high": 7.81,
+                    "open": 7.8,
+                    "close": 7.81,
+                    "volume": 10275,
+                    "timestamp": "2026-05-17T11:44:00+00:00"
+                },
+                {
+                    "low": 7.8,
+                    "high": 7.81,
+                    "open": 7.8,
+                    "close": 7.81,
+                    "volume": 22200,
+                    "timestamp": "2026-05-17T11:43:00+00:00"
+                },
+                {
+                    "low": 7.8,
+                    "high": 7.8,
+                    "open": 7.8,
+                    "close": 7.8,
+                    "volume": 52413,
+                    "timestamp": "2026-05-17T11:41:00+00:00"
+                },
+                {
+                    "low": 7.79,
+                    "high": 7.81,
+                    "open": 7.8,
+                    "close": 7.81,
+                    "volume": 200805,
+                    "timestamp": "2026-05-17T11:40:00+00:00"
+                },
+                {
+                    "low": 7.8,
+                    "high": 7.8,
+                    "open": 7.8,
+                    "close": 7.8,
+                    "volume": 7352,
+                    "timestamp": "2026-05-17T11:39:00+00:00"
+                }
+            ],
+            "latest_news": [
+                {
+                    "url": "https://nabaajordan.com/articles/492540",
+                    "title": "د.عزالدين كناكرية يكتب : نستمد في صندوق استثمار أموال \"الضمان\" من العلم معاني الالتزام والمسؤولية - نبأ الأردن",
+                    "published_at": "2026-04-16T17:56:39+00:00",
+                    "sentiment_label": "Positive"
+                }
+            ],
+            "latest_price": 7.8,
+            "ai_prediction": {
+                "ml_signal": "UP",
+                "probability": 0.9487692102470897,
+                "model_version": "EGX360_v8.4",
+                "overall_trend": "BULLISH",
+                "prediction_date": "2026-05-14"
+            },
+            "data_timestamp": "2026-05-17T11:46:00+00:00"
+        },
+        {
+            "change_pct": 4.47,
+            "stock_info": {
+                "id": 63,
+                "sector": "Healthcare",
+                "symbol": "CLHO",
+                "website": "https://www.cleopatrahospitals.com",
+                "logo_url": "https://drive.google.com/thumbnail?id=1yiwhiCshlHCAtD0frBFJjD3fatUt6em9&sz=w1000",
+                "isin_code": "EGS330R1C018",
+                "prev_close": 15.43,
+                "description": "أكبر مجموعة مستشفيات قطاع خاص في مصر.",
+                "listing_date": "2016-06-02",
+                "total_shares": null,
+                "company_name_ar": "مستشفيات كليوباترا",
+                "company_name_en": "Cleopatra Hospitals"
+            },
+            "last_7_ohlc": [
+                {
+                    "low": 16.12,
+                    "high": 16.12,
+                    "open": 16.12,
+                    "close": 16.12,
+                    "volume": 3,
+                    "timestamp": "2026-05-17T11:45:00+00:00"
+                },
+                {
+                    "low": 16.15,
+                    "high": 16.15,
+                    "open": 16.15,
+                    "close": 16.15,
+                    "volume": 102,
+                    "timestamp": "2026-05-17T11:44:00+00:00"
+                },
+                {
+                    "low": 16.15,
+                    "high": 16.2,
+                    "open": 16.2,
+                    "close": 16.15,
+                    "volume": 89,
+                    "timestamp": "2026-05-17T11:42:00+00:00"
+                },
+                {
+                    "low": 16.2,
+                    "high": 16.2,
+                    "open": 16.2,
+                    "close": 16.2,
+                    "volume": 1032,
+                    "timestamp": "2026-05-17T11:41:00+00:00"
+                },
+                {
+                    "low": 16.2,
+                    "high": 16.23,
+                    "open": 16.23,
+                    "close": 16.2,
+                    "volume": 1329,
+                    "timestamp": "2026-05-17T11:40:00+00:00"
+                },
+                {
+                    "low": 16.2,
+                    "high": 16.2,
+                    "open": 16.2,
+                    "close": 16.2,
+                    "volume": 32,
+                    "timestamp": "2026-05-17T11:39:00+00:00"
+                },
+                {
+                    "low": 16.24,
+                    "high": 16.24,
+                    "open": 16.24,
+                    "close": 16.24,
+                    "volume": 16,
+                    "timestamp": "2026-05-17T11:38:00+00:00"
+                }
+            ],
+            "latest_news": [
+                {
+                    "url": "https://www.cairo24.com/2412103",
+                    "title": "حقيقة رفض إدارة مستشفى النيل بدراوي التابعة لمجموعة كليوباترا استخدام حقنة مستوردة من الخارج لمريض - القاهرة 24",
+                    "published_at": "2026-04-23T21:54:49+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://www.cairo24.com/2411721",
+                    "title": "استشاريون متخصصون على مدار الساعة ومسارات سريعة لإنقاذ الحياة.. طوارئ مستشفى كليوباترا التجمع 'سكاي' تضع معايير جديدة للاستجابة الفورية تحت شعار 'خبرة تطمّنك - القاهرة 24",
+                    "published_at": "2026-04-23T11:20:46+00:00",
+                    "sentiment_label": "Positive"
+                },
+                {
+                    "url": "https://almalnews.com/2109844/%C2%AB%D8%A8%D8%B1%D8%A7%D9%8A%D9%85-%D9%83%D8%A7%D8%A8%D9%8A%D8%AA%D8%A7%D9%84%C2%BB-%D9%85%D8%AF%D9%8A%D8%B1%D9%8B%D8%A7-%D9%84%D8%B7%D8%B1%D8%AD-%D8%A3%D8%B3%D9%87%D9%85-%C2%AB%D9%82%D8%B1%D8%A9-%D9%84%D9%85%D8%B4%D8%B1%D9%88%D8%B9%D8%A7%D8%AA/",
+                    "title": "«برايم كابيتال» مديرًا لطرح أسهم «قرة لمشروعات الطاقة» في البورصة - جريدة المال",
+                    "published_at": "2026-04-23T10:04:43+00:00",
+                    "sentiment_label": "Positive"
+                }
+            ],
+            "latest_price": 16.12,
+            "ai_prediction": {
+                "ml_signal": "UP",
+                "probability": 0.9487561417190263,
+                "model_version": "EGX360_v8.4",
+                "overall_trend": "BULLISH",
+                "prediction_date": "2026-05-14"
+            },
+            "data_timestamp": "2026-05-17T11:45:00+00:00"
+        }
+    ],
+    "bottom_3_losers": [
+        {
+            "change_pct": -5.26,
+            "stock_info": {
+                "id": 73,
+                "sector": "Banks",
+                "symbol": "ADIB",
+                "website": "https://www.adib.eg",
+                "logo_url": "https://drive.google.com/thumbnail?id=1gDseBcv8nbxV0KmCRL7LxZi82amMAI7b&sz=w1000",
+                "isin_code": "EGS60041C018",
+                "prev_close": 49.6,
+                "description": "يقدم خدمات مصرفية إسلامية رائدة.",
+                "listing_date": "1999-01-01",
+                "total_shares": null,
+                "company_name_ar": "مصرف أبو ظبي الإسلامي",
+                "company_name_en": "Abu Dhabi Islamic Bank"
+            },
+            "last_7_ohlc": [
+                {
+                    "low": 46.99,
+                    "high": 46.99,
+                    "open": 46.99,
+                    "close": 46.99,
+                    "volume": 308,
+                    "timestamp": "2026-05-17T11:46:00+00:00"
+                },
+                {
+                    "low": 46.84,
+                    "high": 46.99,
+                    "open": 46.99,
+                    "close": 46.84,
+                    "volume": 116,
+                    "timestamp": "2026-05-17T11:45:00+00:00"
+                },
+                {
+                    "low": 46.98,
+                    "high": 46.99,
+                    "open": 46.98,
+                    "close": 46.99,
+                    "volume": 2194,
+                    "timestamp": "2026-05-17T11:44:00+00:00"
+                },
+                {
+                    "low": 46.98,
+                    "high": 46.98,
+                    "open": 46.98,
+                    "close": 46.98,
+                    "volume": 300,
+                    "timestamp": "2026-05-17T11:43:00+00:00"
+                },
+                {
+                    "low": 46.8,
+                    "high": 46.98,
+                    "open": 46.8,
+                    "close": 46.98,
+                    "volume": 7817,
+                    "timestamp": "2026-05-17T11:42:00+00:00"
+                },
+                {
+                    "low": 46.9,
+                    "high": 46.9,
+                    "open": 46.9,
+                    "close": 46.9,
+                    "volume": 7008,
+                    "timestamp": "2026-05-17T11:41:00+00:00"
+                },
+                {
+                    "low": 46.9,
+                    "high": 46.9,
+                    "open": 46.9,
+                    "close": 46.9,
+                    "volume": 864,
+                    "timestamp": "2026-05-17T11:40:00+00:00"
+                }
+            ],
+            "latest_news": [
+                {
+                    "url": "https://mwq3masr.com/%D8%B3%D8%B9%D8%B1-%D8%A7%D9%84%D8%AF%D9%88%D9%84%D8%A7%D8%B1-%D9%85%D9%82%D8%A7%D8%A8%D9%84-%D8%A7%D9%84%D8%AC%D9%86%D9%8A%D9%87-%D8%A7%D9%84%D9%8A%D9%88%D9%85-%D8%A7%D9%84%D8%AC%D9%85%D8%B9%D8%A9-15/",
+                    "title": "سعر الدولار مقابل الجنيه اليوم الجمعة 15 مايو 2026 - موقع مصر الإخباري",
+                    "published_at": "2026-05-15T06:32:16+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://www.masrawy.com/news/news-banking/details/2026/5/14/2988095/%D8%AA%D8%B1%D8%A7%D8%AC%D8%B9-%D9%81%D9%8A-9-%D8%A8%D9%86%D9%88%D9%83-%D8%B3%D8%B9%D8%B1-%D8%A7%D9%84%D8%AF%D9%88%D9%84%D8%A7%D8%B1-%D9%85%D9%82%D8%A7%D8%A8%D9%84-%D8%A7%D9%84%D8%AC%D9%86%D9%8A%D9%87-%D9%85%D8%B9-%D8%AE%D8%AA%D8%A7%D9%85-%D8%AA%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%A7%D9%84%D9%8A%D9%88%D9%85",
+                    "title": "تراجع في 9 بنوك.. سعر الدولار مقابل الجنيه مع ختام تعاملات اليوم - Masrawy",
+                    "published_at": "2026-05-14T13:29:08+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://www.alyaum.com/ampArticle/6661980",
+                    "title": "سعر الدولار مقابل الجنيه اليوم الخميس.. تراجع طفيف بختام التعاملات - alyaum",
+                    "published_at": "2026-05-14T13:03:00+00:00",
+                    "sentiment_label": "Neutral"
+                }
+            ],
+            "latest_price": 46.99,
+            "ai_prediction": {
+                "ml_signal": "UP",
+                "probability": 0.949105935105183,
+                "model_version": "EGX360_v8.4",
+                "overall_trend": "BULLISH",
+                "prediction_date": "2026-05-14"
+            },
+            "data_timestamp": "2026-05-17T11:46:00+00:00"
+        },
+        {
+            "change_pct": -3.85,
+            "stock_info": {
+                "id": 72,
+                "sector": "Real Estate",
+                "symbol": "PHDC",
+                "website": "https://palmhillsdevelopments.com",
+                "logo_url": "https://drive.google.com/thumbnail?id=13GnNnOj7DVAryYZXSTv0tUThzT2uzxUy&sz=w1000",
+                "isin_code": "EGS65591C015",
+                "prev_close": 14.3,
+                "description": "شركة رائدة في تطوير المشاريع العقارية والتجارية.",
+                "listing_date": "2008-04-16",
+                "total_shares": null,
+                "company_name_ar": "بالم هيلز للتعمير",
+                "company_name_en": "Palm Hills Developments"
+            },
+            "last_7_ohlc": [
+                {
+                    "low": 13.75,
+                    "high": 13.75,
+                    "open": 13.75,
+                    "close": 13.75,
+                    "volume": 49757,
+                    "timestamp": "2026-05-17T11:46:00+00:00"
+                },
+                {
+                    "low": 13.76,
+                    "high": 13.77,
+                    "open": 13.77,
+                    "close": 13.76,
+                    "volume": 13720,
+                    "timestamp": "2026-05-17T11:45:00+00:00"
+                },
+                {
+                    "low": 13.77,
+                    "high": 13.77,
+                    "open": 13.77,
+                    "close": 13.77,
+                    "volume": 3014,
+                    "timestamp": "2026-05-17T11:44:00+00:00"
+                },
+                {
+                    "low": 13.78,
+                    "high": 13.78,
+                    "open": 13.78,
+                    "close": 13.78,
+                    "volume": 1,
+                    "timestamp": "2026-05-17T11:43:00+00:00"
+                },
+                {
+                    "low": 13.77,
+                    "high": 13.78,
+                    "open": 13.78,
+                    "close": 13.77,
+                    "volume": 1048,
+                    "timestamp": "2026-05-17T11:42:00+00:00"
+                },
+                {
+                    "low": 13.76,
+                    "high": 13.78,
+                    "open": 13.78,
+                    "close": 13.76,
+                    "volume": 9284,
+                    "timestamp": "2026-05-17T11:41:00+00:00"
+                },
+                {
+                    "low": 13.76,
+                    "high": 13.77,
+                    "open": 13.76,
+                    "close": 13.77,
+                    "volume": 1103,
+                    "timestamp": "2026-05-17T11:40:00+00:00"
+                }
+            ],
+            "latest_news": [
+                {
+                    "url": "https://www.masrawy.com/news/news_economy/details/2026/5/12/2986994/%D8%B5%D8%B9%D9%88%D8%AF-%D8%A3%D8%B3%D9%87%D9%85-%D8%A7%D9%84%D8%A3%D8%AF%D9%88%D9%8A%D8%A9-%D9%83%D9%8A%D9%81-%D8%AA%D8%AD%D8%B1%D9%83%D8%AA-%D9%85%D8%A4%D8%B4%D8%B1%D8%A7%D8%AA-%D8%A7%D9%84%D8%A8%D9%88%D8%B1%D8%B5%D8%A9-%D8%A8%D9%86%D9%87%D8%A7%D9%8A%D8%A9-%D8%AC%D9%84%D8%B3%D8%A9-%D8%A7%D9%84%D8%AB%D9%84%D8%A7%D8%AB%D8%A7%D8%A1-",
+                    "title": "صعود أسهم الأدوية.. كيف تحركت مؤشرات البورصة بنهاية جلسة الثلاثاء؟ - Masrawy",
+                    "published_at": "2026-05-12T14:44:47+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://www.youm7.com/story/2026/5/12/%D8%AA%D8%B1%D8%A7%D8%AC%D8%B9-%D8%A7%D9%84%D9%85%D8%A4%D8%B4%D8%B1-%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A-%D9%84%D9%84%D8%A8%D9%88%D8%B1%D8%B5%D8%A9-%D9%87%D8%A7%D9%85%D8%B4%D9%8A%D9%8B%D8%A7-%D8%A8%D9%85%D8%B3%D8%AA%D9%87%D9%84-%D8%AA%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AC%D9%84%D8%B3%D8%A9-%D9%85%D9%86%D8%AA%D8%B5%D9%81-%D8%A7%D9%84%D8%A3%D8%B3%D8%A8%D9%88%D8%B9/7412803",
+                    "title": "تراجع المؤشر الرئيسي للبورصة هامشيًا بمستهل تعاملات جلسة منتصف الأسبوع - اليوم السابع",
+                    "published_at": "2026-05-12T07:36:00+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://almalnews.com/2113382/%C2%ABHSBC%C2%BB-%D8%AA%D8%B1%D9%81%D8%B9-%D8%AA%D9%82%D9%8A%D9%8A%D9%85-%D8%B3%D9%87%D9%85-%C2%AB%D8%A8%D8%A7%D9%84%D9%85-%D9%87%D9%8A%D9%84%D8%B2%C2%BB-%D9%88%D8%AA%D8%AA%D9%88%D9%82%D8%B9/",
+                    "title": "«HSBC» ترفع تقييم سهم «بالم هيلز» وتتوقع مبيعات تتجاوز 1.4 تريليون جنيه خلال 5 سنوات - جريدة المال",
+                    "published_at": "2026-05-12T06:33:19+00:00",
+                    "sentiment_label": "Neutral"
+                }
+            ],
+            "latest_price": 13.75,
+            "ai_prediction": {
+                "ml_signal": "UP",
+                "probability": 0.9490680593742054,
+                "model_version": "EGX360_v8.4",
+                "overall_trend": "BULLISH",
+                "prediction_date": "2026-05-14"
+            },
+            "data_timestamp": "2026-05-17T11:46:00+00:00"
+        },
+        {
+            "change_pct": -3.14,
+            "stock_info": {
+                "id": 1,
+                "sector": "Real Estate",
+                "symbol": "TMGH",
+                "website": "https://www.tmg.com.eg",
+                "logo_url": "https://drive.google.com/uc?export=view&id=1uUYqPlcZK4wmb-CO62mS-sYwYYNWmBoU",
+                "isin_code": "EGS65001C013",
+                "prev_close": 97.05,
+                "description": "Talaat Moustafa Group Holding is one of the largest real estate developers in Egypt.",
+                "listing_date": "2007-11-01",
+                "total_shares": 2063562286,
+                "company_name_ar": "مجموعة طلعت مصطفى",
+                "company_name_en": "Talaat Moustafa Group"
+            },
+            "last_7_ohlc": [
+                {
+                    "low": 94,
+                    "high": 94.2,
+                    "open": 94.2,
+                    "close": 94,
+                    "volume": 7271,
+                    "timestamp": "2026-05-17T11:46:00+00:00"
+                },
+                {
+                    "low": 94,
+                    "high": 94,
+                    "open": 94,
+                    "close": 94,
+                    "volume": 96,
+                    "timestamp": "2026-05-17T11:45:00+00:00"
+                },
+                {
+                    "low": 94,
+                    "high": 94,
+                    "open": 94,
+                    "close": 94,
+                    "volume": 10000,
+                    "timestamp": "2026-05-17T11:44:00+00:00"
+                },
+                {
+                    "low": 93.89,
+                    "high": 94.2,
+                    "open": 93.89,
+                    "close": 94,
+                    "volume": 101322,
+                    "timestamp": "2026-05-17T11:43:00+00:00"
+                },
+                {
+                    "low": 93.85,
+                    "high": 93.85,
+                    "open": 93.85,
+                    "close": 93.85,
+                    "volume": 282,
+                    "timestamp": "2026-05-17T11:42:00+00:00"
+                },
+                {
+                    "low": 93.86,
+                    "high": 93.86,
+                    "open": 93.86,
+                    "close": 93.86,
+                    "volume": 21,
+                    "timestamp": "2026-05-17T11:41:00+00:00"
+                },
+                {
+                    "low": 93.8,
+                    "high": 93.88,
+                    "open": 93.85,
+                    "close": 93.86,
+                    "volume": 9423,
+                    "timestamp": "2026-05-17T11:40:00+00:00"
+                }
+            ],
+            "latest_news": [
+                {
+                    "url": "https://alboslanews.com/%D8%A3%D8%B3%D9%88%D8%A7%D9%82-%D9%85%D8%A7%D9%84/%D8%B3%D9%87%D9%85-%D8%B7%D9%84%D8%B9%D8%AA-%D9%85%D8%B5%D8%B7%D9%81%D9%89-%D8%A7%D9%84%D8%A3%D9%86%D8%B4%D8%B7-%D9%81%D9%8A-%D8%A7%D9%84%D8%A8%D9%88%D8%B1%D8%B5%D8%A9-%D8%A7%D9%84%D9%85%D8%B5%D8%B1%D9%8A%D8%A9-%D8%A8%D9%80-27-%D9%85%D9%84%D9%8A%D8%A7%D8%B1-%D8%AC%D9%86%D9%8A%D9%87-%D8%AE%D9%84%D8%A7%D9%84-%D8%A7%D9%84%D8%A3%D8%B3%D8%A8%D9%88%D8%B9-418262",
+                    "title": "سهم \"طلعت مصطفى\" الأنشط في البورصة المصرية بـ 2.7 مليار جنيه خلال الأسبوع - مجلة البوصلة الاقتصادية",
+                    "published_at": "2026-05-15T04:31:48+00:00",
+                    "sentiment_label": "Neutral"
+                },
+                {
+                    "url": "https://www.masrawy.com/news/news_economy/details/2026/5/14/2988171/%D8%A7%D9%84%D8%A3%D8%B3%D9%87%D9%85-%D8%A7%D9%84%D9%82%D9%8A%D8%A7%D8%AF%D9%8A%D8%A9-%D8%AA%D9%82%D9%88%D8%AF-%D8%AA%D8%B1%D8%A7%D8%AC%D8%B9-%D8%A7%D9%84%D8%A8%D9%88%D8%B1%D8%B5%D8%A9-%D8%A8%D9%86%D9%87%D8%A7%D9%8A%D8%A9-%D8%AC%D9%84%D8%B3%D8%A9-%D8%A7%D9%84%D9%8A%D9%88%D9%85-%D8%A7%D9%84%D8%AE%D9%85%D9%8A%D8%B3",
+                    "title": "الأسهم القيادية تقود تراجع البورصة بنهاية جلسة اليوم الخميس - Masrawy",
+                    "published_at": "2026-05-14T15:42:05+00:00",
+                    "sentiment_label": "Negative"
+                },
+                {
+                    "url": "https://www.almasryalyoum.com/news/details/4269572",
+                    "title": "ارتفاع أرباح طلعت مصطفى 24% خلال 3 أشهر - المصري اليوم",
+                    "published_at": "2026-05-13T22:48:00+00:00",
+                    "sentiment_label": "Positive"
+                }
+            ],
+            "latest_price": 94,
+            "ai_prediction": {
+                "ml_signal": "UP",
+                "probability": 0.9360499813943515,
+                "model_version": "EGX360_v8.4",
+                "overall_trend": "BULLISH",
+                "prediction_date": "2026-05-14"
+            },
+            "data_timestamp": "2026-05-17T11:46:00+00:00"
+        }
+    ],
+    "api_generated_at": "2026-05-19T22:38:24.154159+00:00"
+}
