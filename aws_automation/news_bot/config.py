@@ -19,7 +19,8 @@ load_dotenv(dotenv_path=env_path)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-CEREBRAS_APIKEY=os.getenv("CEREBRAS_APIKEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 
 # crypto feeds

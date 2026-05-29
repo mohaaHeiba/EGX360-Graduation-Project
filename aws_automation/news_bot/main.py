@@ -2,7 +2,8 @@ import time
 import feedparser
 import trafilatura
 import random
-from datetime import datetime, timezone
+import requests
+from datetime import datetime, timezone, timedelta
 from dateutil import parser
 from urllib.parse import quote
 from selenium import webdriver
@@ -54,9 +55,11 @@ class EGX360Bot:
         neg_en = "-football -soccer -sports -match -player -club -league -cup -tournament"
         
         if lang == 'ar':
-            query = f'"{clean_name}" AND (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) {neg_ar} when:5d'
+            # Removed exact quotes around clean_name for Arabic. 
+            # Arabic has many spelling variations (أ/ا, ة/ه, spaces), so quotes block 80% of valid news.
+            query = f'{clean_name} (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) {neg_ar} when:5d'
         else:
-            query = f'"{clean_name}" OR "{symbol}" AND (stock OR market OR finance OR earnings OR trading) {neg_en} when:5d'
+            query = f'("{clean_name}" OR "{symbol}") (stock OR market OR finance OR earnings OR trading) {neg_en} when:5d'
             
         return quote(query)
 
@@ -72,7 +75,7 @@ class EGX360Bot:
         except: pass
         return True, datetime.now(timezone.utc)
 
-    def process_and_save_news(self, stock_id, symbol, title, description, content, url, source, pub_date, is_api, send_alert):
+    def process_and_save_news(self, stock_id, symbol, title, description, content, url, source, pub_date, is_api, send_alert, use_finbert=False):
         if self.db.is_url_duplicate(stock_id, url): return False 
         if self.db.is_title_duplicate(stock_id, title): return False
 
@@ -86,7 +89,11 @@ class EGX360Bot:
             if not base_content or len(base_content) < 20:
                 base_content = title
 
-        if self.ai.is_arabic(title + base_content):
+        if use_finbert:
+            sentiment = self.ai.process_english(title, base_content)
+            is_valid = True
+            final_content = f"{title}. {base_content}"
+        elif self.ai.is_arabic(title + base_content):
             is_valid, sentiment, final_content = self.ai.process_arabic(title, base_content)
         else:
             is_valid, sentiment, final_content = self.ai.process_english_llm(title, base_content)
@@ -121,27 +128,27 @@ class EGX360Bot:
                 symbol, name_ar, stock_id = stock['symbol'], stock['company_name_ar'], stock['id']
                 notified_this_run = False 
                 
-                # Search both Arabic and English sources
+                # Search only Arabic sources for EGX Stocks
                 search_configs = [
-                    {'lang': 'ar', 'hl': 'ar', 'gl': 'EG', 'ceid': 'EG:ar', 'label': 'Google News (AR)'},
-                    {'lang': 'en', 'hl': 'en', 'gl': 'US', 'ceid': 'US:en', 'label': 'Google News (EN)'}
+                    {'lang': 'ar', 'hl': 'ar', 'gl': 'EG', 'ceid': 'EG:ar', 'label': 'Google News (AR)'}
                 ]
 
                 for config in search_configs:
-                    encoded_query = self.build_smart_query(name_ar, symbol, lang=config['lang'])
+                    name_to_use = name_ar if config['lang'] == 'ar' else stock.get('company_name_en', symbol)
+                    encoded_query = self.build_smart_query(name_to_use, symbol, lang=config['lang'])
                     rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl={config['hl']}&gl={config['gl']}&ceid={config['ceid']}"
 
                     print(f"\n🔎 [{symbol}] Scanning RSS ({config['label']})...")
                     feed = feedparser.parse(rss_url)
                     
-                    entries = feed.entries[:3]
+                    entries = feed.entries[:5]
                     print(f"   Found {len(feed.entries)} entries, taking top {len(entries)}")
 
                     for entry in entries:
                         title = entry.title
                         print(f"\n   📰 Title: {title[:60]}...")
                         
-                        fresh, pub_date = self.is_fresh_news(entry, max_days=3)
+                        fresh, pub_date = self.is_fresh_news(entry, max_days=5)
                         if not fresh:
                             print(f"      ⏩ Skipped: Too old ({pub_date})")
                             continue
@@ -253,10 +260,13 @@ class EGX360Bot:
                     rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
                     content_for_ai = f"{title}. {rss_desc}"
 
+                    print("      ⚡ Fast processing (Local FinBERT Sentiment)...")
+
                     is_saved = self.process_and_save_news(
                         stock_id=coin['id'], symbol=symbol, title=title, description=rss_desc[:500], 
                         content=content_for_ai, url=final_url, source="Google Crypto News", 
-                        pub_date=pub_date, is_api=True, send_alert=not notified_this_run 
+                        pub_date=pub_date, is_api=True, send_alert=not notified_this_run,
+                        use_finbert=True
                     )
                     
                     if is_saved:
@@ -272,76 +282,69 @@ class EGX360Bot:
             driver.quit()
 
     def process_finnhub(self, finnhub_list):
-        print(f"\n{'='*50}\n🇺🇸 US STOCKS/ETFs ENGINE: Fetching Titles Only\n{'='*50}")
-        session_processed_titles = [] 
+        print(f"\n{'='*50}\n🇺🇸 US STOCKS/ETFs ENGINE: Direct API & Offline BERT\n{'='*50}")
+        import config
         
         try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            
             for item in finnhub_list:
                 symbol = item['symbol']
-                name_en = item['company_name_en']
                 notified_this_run = False 
                 
-                query = f'"{name_en}" OR "{symbol}" AND (stock OR market OR earnings OR finance) when:3d'
-                encoded_query = quote(query)
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
-
-                print(f"\n🔎 [{symbol}] Scanning RSS...")
-                feed = feedparser.parse(rss_url)
+                print(f"\n🔎 [{symbol}] Fetching directly from Finnhub API...")
+                url = f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={yesterday}&to={today}&token={config.FINNHUB_API_KEY}"
                 
-                sorted_entries = sorted(feed.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
-                entries_to_check = sorted_entries[:3]
-                print(f"   Found {len(feed.entries)} entries, taking top {len(entries_to_check)}.")
+                response = requests.get(url, timeout=10)
+                if response.status_code != 200:
+                    print(f"      ⚠️ Finnhub HTTP {response.status_code}")
+                    continue
+                    
+                news_data = response.json()
+                if not news_data:
+                    print("      ⚠️ No recent news found via API.")
+                    continue
+                    
+                print(f"   Found {len(news_data)} API articles, checking top 3.")
                 
-                for index, entry in enumerate(entries_to_check, start=1):
-                    title = entry.title
-                    link = entry.link
+                for index, article in enumerate(news_data[:3], start=1):
+                    headline = article.get("headline", "")
+                    summary = article.get("summary", "")
+                    link = article.get("url", "")
+                    unix_time = article.get("datetime")
                     
-                    print(f"   📰 Checking ({index}/3): {title[:50]}...")
+                    if not headline or not link: continue
                     
-                    if self.scraper.is_blacklisted(link, title):
-                        print("      ⏩ Skipped: Blacklisted domain")
-                        continue 
-
-                    is_session_duplicate = False
-                    clean_new_title = re.sub(r'[^\w\s]', '', title).lower()
-                    for past_title in session_processed_titles:
-                        if SequenceMatcher(None, clean_new_title, past_title).ratio() > 0.80:
-                            is_session_duplicate = True
-                            break
-                            
-                    if is_session_duplicate:
-                        print("      🚫 Skipped: Found similar news in this session")
-                        continue
+                    print(f"   📰 Checking ({index}/3): {headline[:50]}...")
                     
-                    fresh, pub_date = self.is_fresh_news(entry, max_days=3)
-                    if not fresh:
+                    pub_date = datetime.fromtimestamp(unix_time, timezone.utc)
+                    if (datetime.now(timezone.utc) - pub_date).days > 3:
                         print("      ⏩ Skipped: Too old")
                         continue
-
-                    if self.db.is_title_duplicate(item['id'], title):
-                        print("      🚫 Skipped: Duplicate title detected in DB")
+                    
+                    if self.db.is_url_duplicate(item['id'], link) or self.db.is_title_duplicate(item['id'], headline):
+                        print("      🚫 Skipped: Duplicate detected in DB")
                         continue
 
-                    # Bypass Selenium and Scrapers entirely - just use Title and RSS Description
-                    rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
-                    content_for_ai = f"{title}. {rss_desc}"
+                    content_for_ai = summary if summary else headline
                     
-                    print("      ⚡ Fast processing (Title only, no Selenium)...")
+                    print("      ⚡ Fast processing (Local FinBERT Sentiment)...")
 
                     is_saved = self.process_and_save_news(
-                        stock_id=item['id'], symbol=symbol, title=title, description=rss_desc[:500], 
-                        content=content_for_ai, url=link, source="Google US News", 
-                        pub_date=pub_date, is_api=True, send_alert=not notified_this_run 
+                        stock_id=item['id'], symbol=symbol, title=headline, description=summary[:500], 
+                        content=content_for_ai, url=link, source=article.get("source", "Finnhub API"), 
+                        pub_date=pub_date, is_api=True, send_alert=not notified_this_run,
+                        use_finbert=True
                     )
                     
                     if is_saved:
-                        session_processed_titles.append(clean_new_title)
                         notified_this_run = True 
                 
                 time.sleep(1)
                 
         except Exception as e:
-            print(f"      🚨 US Engine Error: {e}")
+            print(f"      🚨 Finnhub API Engine Error: {e}")
 
     def run(self):
         start_time = datetime.now()

@@ -12,7 +12,7 @@ yfinance
 transformers
 torch
 cerebras-cloud-sdk
-
+groq
 # --- Database & Cloud Integration ---
 supabase
 firebase-admin
