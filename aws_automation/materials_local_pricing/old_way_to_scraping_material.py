@@ -22,7 +22,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 
 TABLE_NAME = "materials_prices"
-NOTIFICATION_THRESHOLD = 5.0
+NOTIFICATION_THRESHOLD = 10.0
 
 # --- 2. Initialization ---
 if not firebase_admin._apps:

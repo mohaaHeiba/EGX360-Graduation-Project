@@ -1,5 +1,6 @@
 
 import os
+from urllib import response
 
 from dotenv import load_dotenv
 import pandas as pd
@@ -33,8 +34,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Get only stocks EG
 def get_egx_stocks():
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
-    return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API' or 'API_FINNHUB' and s['sector'] not in ['Crypto', 'Materials','US Stocks','US ETFs']]
-
+    return [s for s in response.data if s.get('candle_table_name') not in ['API', 'API_FINNHUB'] and s.get('sector') not in ['Crypto', 'Materials', 'US Stocks', 'US ETFs']]
 #==============================================================================================================================
 # Time
 EXCHANGE = "EGX"

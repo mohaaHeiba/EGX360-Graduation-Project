@@ -28,7 +28,7 @@ selenium
 webdriver-manager
 undetected-chromedriver
 python-dateutil
-tvdatafeed
+git+https://github.com/rongardF/tvdatafeed.git
 
 # --- Utilities ---
 pytz

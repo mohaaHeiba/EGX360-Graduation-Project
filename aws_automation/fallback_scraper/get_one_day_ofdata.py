@@ -25,7 +25,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_stocks_metadata():
     response = supabase.table("stocks").select("symbol, sector, candle_table_name").execute()
-    return [s for s in response.data if s['candle_table_name'] and s['candle_table_name'] != 'API' or 'API_FINNHUB' and s['sector'] not in ['Crypto', 'Materials','US Stocks','US ETFs']]
+    return [s for s in response.data if s.get('candle_table_name') not in ['API', 'API_FINNHUB'] and s.get('sector') not in ['Crypto', 'US Stocks', 'US ETFs']]
+
 # ==============================================================================================================================
 
 TIMEFRAME_LABEL = "1d"
