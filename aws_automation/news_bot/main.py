@@ -271,6 +271,78 @@ class EGX360Bot:
             print("\n🛑 Closing Chrome Driver (Crypto)...")
             driver.quit()
 
+    def process_finnhub(self, finnhub_list):
+        print(f"\n{'='*50}\n🇺🇸 US STOCKS/ETFs ENGINE: Fetching Titles Only\n{'='*50}")
+        session_processed_titles = [] 
+        
+        try:
+            for item in finnhub_list:
+                symbol = item['symbol']
+                name_en = item['company_name_en']
+                notified_this_run = False 
+                
+                query = f'"{name_en}" OR "{symbol}" AND (stock OR market OR earnings OR finance) when:3d'
+                encoded_query = quote(query)
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+
+                print(f"\n🔎 [{symbol}] Scanning RSS...")
+                feed = feedparser.parse(rss_url)
+                
+                sorted_entries = sorted(feed.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
+                entries_to_check = sorted_entries[:3]
+                print(f"   Found {len(feed.entries)} entries, taking top {len(entries_to_check)}.")
+                
+                for index, entry in enumerate(entries_to_check, start=1):
+                    title = entry.title
+                    link = entry.link
+                    
+                    print(f"   📰 Checking ({index}/3): {title[:50]}...")
+                    
+                    if self.scraper.is_blacklisted(link, title):
+                        print("      ⏩ Skipped: Blacklisted domain")
+                        continue 
+
+                    is_session_duplicate = False
+                    clean_new_title = re.sub(r'[^\w\s]', '', title).lower()
+                    for past_title in session_processed_titles:
+                        if SequenceMatcher(None, clean_new_title, past_title).ratio() > 0.80:
+                            is_session_duplicate = True
+                            break
+                            
+                    if is_session_duplicate:
+                        print("      🚫 Skipped: Found similar news in this session")
+                        continue
+                    
+                    fresh, pub_date = self.is_fresh_news(entry, max_days=3)
+                    if not fresh:
+                        print("      ⏩ Skipped: Too old")
+                        continue
+
+                    if self.db.is_title_duplicate(item['id'], title):
+                        print("      🚫 Skipped: Duplicate title detected in DB")
+                        continue
+
+                    # Bypass Selenium and Scrapers entirely - just use Title and RSS Description
+                    rss_desc = self.scraper.clean_html(entry.description) if 'description' in entry else ""
+                    content_for_ai = f"{title}. {rss_desc}"
+                    
+                    print("      ⚡ Fast processing (Title only, no Selenium)...")
+
+                    is_saved = self.process_and_save_news(
+                        stock_id=item['id'], symbol=symbol, title=title, description=rss_desc[:500], 
+                        content=content_for_ai, url=link, source="Google US News", 
+                        pub_date=pub_date, is_api=True, send_alert=not notified_this_run 
+                    )
+                    
+                    if is_saved:
+                        session_processed_titles.append(clean_new_title)
+                        notified_this_run = True 
+                
+                time.sleep(1)
+                
+        except Exception as e:
+            print(f"      🚨 US Engine Error: {e}")
+
     def run(self):
         start_time = datetime.now()
         print(f"🚀 Job Started: {start_time}")
@@ -280,9 +352,11 @@ class EGX360Bot:
             print(f"✅ Loaded {len(all_stocks)} items from DB")
 
             crypto = [s for s in all_stocks if 'Crypto' in s.get('sector', '')]
-            stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '')]
+            finnhub = [s for s in all_stocks if s.get('candle_table_name') == 'API_FINNHUB' or 'US ' in s.get('sector', '')]
+            stocks = [s for s in all_stocks if 'Crypto' not in s.get('sector', '') and s.get('candle_table_name') != 'API_FINNHUB' and 'US ' not in s.get('sector', '')]
 
             if crypto: self.process_crypto(crypto)
+            if finnhub: self.process_finnhub(finnhub)
             if stocks: self.process_stocks(stocks)
 
         except Exception as e: 
