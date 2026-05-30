@@ -49,18 +49,7 @@ class EGX360Bot:
 
     def build_smart_query(self, company_name, symbol, lang='ar'):
         clean_name = company_name.replace("المصرية", "").replace("القابضة", "").strip()
-        
-        # Negative keywords to exclude sports/football
-        neg_ar = "-كرة -قدم -رياضة -مباراة -لاعب -نادي -دوري -كأس -بطولة"
-        neg_en = "-football -soccer -sports -match -player -club -league -cup -tournament"
-        
-        if lang == 'ar':
-            # Removed exact quotes around clean_name for Arabic. 
-            # Arabic has many spelling variations (أ/ا, ة/ه, spaces), so quotes block 80% of valid news.
-            query = f'{clean_name} (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) {neg_ar} when:5d'
-        else:
-            query = f'("{clean_name}" OR "{symbol}") (stock OR market OR finance OR earnings OR trading) {neg_en} when:5d'
-            
+        query = f'"{clean_name}" AND (سهم OR بورصة OR أرباح OR تداول OR اقتصاد OR جنيه) when:5d'
         return quote(query)
 
     def is_fresh_news(self, entry, max_days=3):
@@ -75,7 +64,7 @@ class EGX360Bot:
         except: pass
         return True, datetime.now(timezone.utc)
 
-    def process_and_save_news(self, stock_id, symbol, title, description, content, url, source, pub_date, is_api, send_alert, use_finbert=False):
+    def process_and_save_news(self, stock_id, symbol, title, description, content, url, source, pub_date, is_api, send_alert, use_finbert=False, company_name=None):
         if self.db.is_url_duplicate(stock_id, url): return False 
         if self.db.is_title_duplicate(stock_id, title): return False
 
@@ -94,7 +83,7 @@ class EGX360Bot:
             is_valid = True
             final_content = f"{title}. {base_content}"
         elif self.ai.is_arabic(title + base_content):
-            is_valid, sentiment, final_content = self.ai.process_arabic(title, base_content)
+            is_valid, sentiment, final_content = self.ai.process_arabic(title, base_content, company_name=company_name)
         else:
             is_valid, sentiment, final_content = self.ai.process_english_llm(title, base_content)
 
@@ -189,7 +178,7 @@ class EGX360Bot:
 
                         is_saved = self.process_and_save_news(
                             stock_id, symbol, title, rss_desc, content, final_url, config['label'], pub_date, 
-                            is_api=False, send_alert=not notified_this_run 
+                            is_api=False, send_alert=not notified_this_run, company_name=name_to_use
                         )
                         
                         if is_saved: notified_this_run = True
