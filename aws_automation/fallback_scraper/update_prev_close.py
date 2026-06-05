@@ -51,9 +51,25 @@ def update_prev_closes():
             print(f"🔍 Processing {symbol}...")
 
             try:
+                # 1. First, find the absolute latest data we have for this stock
+                latest_res = supabase.table(table_name)\
+                    .select("timestamp")\
+                    .order("timestamp", desc=True)\
+                    .limit(1)\
+                    .execute()
+
+                if not latest_res.data:
+                    print(f"   ⚠️ No data found for {symbol} at all.")
+                    continue
+                
+                # Extract the start of the day for the LATEST available candle
+                latest_timestamp = latest_res.data[0]['timestamp']
+                latest_day_start = latest_timestamp[:10] + " 00:00:00"
+
+                # 2. Find the last candle from BEFORE that latest day
                 candle_res = supabase.table(table_name)\
                     .select("close, timestamp")\
-                    .lt("timestamp", today_start)\
+                    .lt("timestamp", latest_day_start)\
                     .order("timestamp", desc=True)\
                     .limit(1)\
                     .execute()
@@ -68,7 +84,7 @@ def update_prev_closes():
 
                     print(f"   ✅ Updated {symbol}: prev_close = {last_close_price} (From: {last_date})")
                 else:
-                    print(f"   ⚠️ No previous candle data found for {symbol} before today.")
+                    print(f"   ⚠️ No previous candle data found for {symbol} before its latest day.")
 
             except Exception as e:
                 print(f"   ❌ Error updating {symbol}: {str(e)}")

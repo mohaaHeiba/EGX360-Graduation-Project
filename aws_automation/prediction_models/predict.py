@@ -9,6 +9,7 @@ from supabase import create_client, Client
 import warnings
 import os
 import requests
+import time
 
 warnings.filterwarnings('ignore')
 
@@ -23,8 +24,24 @@ load_dotenv(dotenv_path=env_path)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") # تأكد إنه Service Role Key
 MASSIVE_API_KEY = os.getenv("MASSIVE_API_KEY")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ==========================================
+# 1.5. Robust Network Fetcher
+# ==========================================
+def fetch_with_retry(url, params=None, timeout=10, max_retries=3):
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            r = requests.get(url, params=params, timeout=timeout)
+            return r
+        except Exception as e:
+            last_err = e
+            print(f"   ⚠️ Network glitch. Retrying {attempt+1}/{max_retries} in 3 seconds...")
+            time.sleep(3)
+    raise last_err
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
@@ -111,12 +128,13 @@ def calculate_technical_features(df, gold_data, usd_data):
     df['day_sin'] = np.sin(2 * np.pi * df.index.dayofweek / 7)
     df['day_cos'] = np.cos(2 * np.pi * df.index.dayofweek / 7)
 
-    return df.ffill().bfill()
+    df = df.replace([np.inf, -np.inf], np.nan)
+    return df.ffill().bfill().fillna(0)
 
 # ==========================================
 # 3. Core Engine (Prediction & Mapping)
 # ==========================================
-def predict_and_generate_payload(df, symbol):
+def predict_and_generate_payload(df, symbol, is_finnhub=False):
     try:
         model = joblib.load(GENERAL_MODEL_PATH)
         scaler = joblib.load(GENERAL_SCALER_PATH)
@@ -150,18 +168,63 @@ def predict_and_generate_payload(df, symbol):
         macd_val = float(last_day['MACD_Hist'])
         macd_status = "Bullish" if macd_val > 0 else "Bearish"
         
-        # Smart Consensus Calculation
-        # Vote 1: ML Prob, Vote 2: MACD, Vote 3: EMA Cross
-        votes_up = (1 if prob > 0.5 else 0) + (1 if macd_val > 0 else 0) + (1 if last_day['EMA_Cross_Signal'] > 0 else 0)
-        up_pct = round((votes_up / 3) * 100, 1)
+        # --- 🔥 Real-Time Reality Check (V5 - Pure Contradiction Filter) ---
+        # Step 1: Calculate the instantaneous percentage change
+        current_close = float(last_day['close'])
+        
+        if is_finnhub and FINNHUB_API_KEY:
+            try:
+                r = fetch_with_retry(f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}", timeout=10)
+                data = r.json()
+                actual_pct_change = float(data.get('dp', 0.0))
+                if data.get('c'):
+                    current_close = float(data['c']) # Update close to real-time price
+            except Exception as e:
+                print(f"⚠️ Finnhub Real-time Fetch Error for {symbol}: {e}")
+                prev_close = float(df.iloc[-2]['close']) if len(df) > 1 else current_close
+                actual_pct_change = ((current_close - prev_close) / prev_close) * 100 if prev_close else 0.0
+        else:
+            prev_close = float(df.iloc[-2]['close']) if len(df) > 1 else current_close
+            actual_pct_change = ((current_close - prev_close) / prev_close) * 100 if prev_close else 0.0
+            
+        # Step 2: Smart Contradiction Filter (Only intervene if ML is WRONG)
+        final_prob = prob # Start with 100% pure ML probability
+        
+        # Case 1: Model is optimistic (>= 50%), but stock is crashing (False Bullish)
+        if prob >= 0.5 and actual_pct_change <= -1.5:
+            penalty = actual_pct_change * 0.25 # e.g. -3% * 0.25 = -0.75
+            penalty = max(-0.80, penalty) # Cap penalty at -80%
+            final_prob += penalty
+            
+        # Case 2: Model is pessimistic (< 50%), but stock is pumping (False Bearish)
+        elif prob < 0.5 and actual_pct_change >= 1.5:
+            boost = actual_pct_change * 0.25 # e.g. 3% * 0.25 = +0.75
+            boost = min(0.80, boost) # Cap boost at +80%
+            final_prob += boost
+            
+        # Step 3: Finalize and Cap (Prevent absolute 0% or 100% for realism)
+        final_prob = max(0.02, min(0.98, final_prob))
+        up_pct = round(final_prob * 100, 1)
+        
+        # Override original ML probability and signal to match the truth
+        prob = final_prob
+        ml_signal = "UP" if prob > 0.5 else "DOWN"
+        
+        # Step 4: Define the Overall Trend
+        if up_pct >= 60.0:
+            overall_trend = "BULLISH"
+        elif up_pct <= 40.0:
+            overall_trend = "BEARISH"
+        else:
+            overall_trend = "NEUTRAL"
         
         payload = {
             "symbol": symbol.upper(),
             "prediction_date": str(df.index[-1].date()),
-            "close_price": float(last_day['close']),
+            "close_price": current_close,
             "probability": prob,
             "ml_signal": ml_signal,
-            "model_version": "EGX360_v8.4",
+            "model_version": "EGX360_v8.5",
             "open_price": float(last_day.get('open', last_day['close'])),
             "high_price": float(last_day.get('high', last_day['close'])),
             "low_price": float(last_day.get('low', last_day['close'])),
@@ -173,14 +236,18 @@ def predict_and_generate_payload(df, symbol):
             "macd_status": macd_status,
             "volatility_status": "High" if last_day['ATR_pct'] > 0.015 else "Low",
             "consensus_up_pct": up_pct,
-            "consensus_down_pct": 100 - up_pct,
-            "overall_trend": "BULLISH" if up_pct >= 66 else ("BEARISH" if up_pct <= 33 else "NEUTRAL"),
+            "consensus_down_pct": round(100.0 - up_pct, 1),
+            "overall_trend": overall_trend,
             "noise": float(last_day['noise'])
         }
 
         # Auto-map the 41 Technical features (Convert to Lowercase for Postgres)
         for col in expected_features:
             payload[col.lower()] = float(last_day[col])
+            
+        # Map raw EMAs that the DB expects but ML doesn't use directly
+        for ema in [9, 10, 20, 21, 31, 50]:
+            payload[f'ema_{ema}'] = float(last_day[f'EMA_{ema}'])
             
         return payload
     except Exception as e:
@@ -240,7 +307,7 @@ def process_symbol(symbol, table, gold, usd, is_crypto=False, is_finnhub=False):
     try:
         if is_crypto:
             url = "https://api.binance.com/api/v3/klines"
-            r = requests.get(url, params={"symbol": f"{symbol}USDT", "interval": "1d", "limit": 100})
+            r = fetch_with_retry(url, params={"symbol": f"{symbol}USDT", "interval": "1d", "limit": 100})
             data = r.json()
             if not data or 'code' in data: return
             df = pd.DataFrame(data, columns=['ts','open','high','low','close','volume','ct','qav','not','tbbav','tbqav','i'])
@@ -252,7 +319,7 @@ def process_symbol(symbol, table, gold, usd, is_crypto=False, is_finnhub=False):
             to_dt = datetime.datetime.now()
             from_dt = to_dt - datetime.timedelta(days=150)
             url = f"https://api.massive.com/v2/aggs/ticker/{symbol}/range/1/day/{from_dt.strftime('%Y-%m-%d')}/{to_dt.strftime('%Y-%m-%d')}"
-            r = requests.get(url, params={"apiKey": MASSIVE_API_KEY})
+            r = fetch_with_retry(url, params={"apiKey": MASSIVE_API_KEY})
             data = r.json()
             if 'results' not in data or not data['results']: return
             df = pd.DataFrame(data['results'])
@@ -269,7 +336,7 @@ def process_symbol(symbol, table, gold, usd, is_crypto=False, is_finnhub=False):
             df.set_index('timestamp', inplace=True)
 
         processed_df = calculate_technical_features(df, gold, usd)
-        payload = predict_and_generate_payload(processed_df, symbol)
+        payload = predict_and_generate_payload(processed_df, symbol, is_finnhub)
         if payload: push_to_supabase(payload)
     except Exception as e:
         print(f"⚠️ Process Failed for {symbol}: {e}")
@@ -283,4 +350,9 @@ if __name__ == "__main__":
             is_crypto = (s['sector'] == 'Crypto' or s['candle_table_name'] == 'API')
             is_finnhub = (s['candle_table_name'] == 'API_FINNHUB')
             process_symbol(s['symbol'], s['candle_table_name'], gold_data, usd_data, is_crypto, is_finnhub)
+            
+            if is_finnhub:
+                time.sleep(13) # Massive API rate limit (5 calls per minute)
+            else:
+                time.sleep(1) # Safe delay for Supabase and Binance
     print("\n🏁 Pipeline Completed!")
