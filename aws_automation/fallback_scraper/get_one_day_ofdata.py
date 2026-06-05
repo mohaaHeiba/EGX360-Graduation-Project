@@ -30,7 +30,7 @@ def fetch_stocks_metadata():
 # ==============================================================================================================================
 
 TIMEFRAME_LABEL = "1d"
-start_date = datetime.date(2026, 5, 16)
+start_date = datetime.date(2026, 5, 25)
 end_date = datetime.date.today()
 date_range = pd.date_range(start=start_date, end=end_date)
 

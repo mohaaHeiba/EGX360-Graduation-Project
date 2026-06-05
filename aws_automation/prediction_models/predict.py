@@ -22,6 +22,7 @@ load_dotenv(dotenv_path=env_path)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") # تأكد إنه Service Role Key
+MASSIVE_API_KEY = os.getenv("MASSIVE_API_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -29,7 +30,7 @@ if not firebase_admin._apps:
     cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
     firebase_admin.initialize_app(cred)
 
-MODEL_DIR = "/home/heiba/EGX360_Graduation_Project/aws_automation/prediction_models"
+MODEL_DIR = "/home/heiba/EGX360-Graduation-Project/aws_automation/prediction_models"
 GENERAL_MODEL_PATH = os.path.join(MODEL_DIR, "egx360_stack_model.pkl")
 GENERAL_SCALER_PATH = os.path.join(MODEL_DIR, "egx360_scaler.pkl")
 
@@ -234,7 +235,7 @@ def push_to_supabase(payload):
 # ==========================================
 # 4. Main Pipeline Execution
 # ==========================================
-def process_symbol(symbol, table, gold, usd, is_crypto=False):
+def process_symbol(symbol, table, gold, usd, is_crypto=False, is_finnhub=False):
     print(f"🔄 Processing {symbol}...")
     try:
         if is_crypto:
@@ -244,6 +245,19 @@ def process_symbol(symbol, table, gold, usd, is_crypto=False):
             if not data or 'code' in data: return
             df = pd.DataFrame(data, columns=['ts','open','high','low','close','volume','ct','qav','not','tbbav','tbqav','i'])
             df['timestamp'] = pd.to_datetime(df['ts'], unit='ms')
+            df.set_index('timestamp', inplace=True)
+            for c in ['open','high','low','close','volume']: df[c] = df[c].astype(float)
+        elif is_finnhub:
+            import datetime
+            to_dt = datetime.datetime.now()
+            from_dt = to_dt - datetime.timedelta(days=150)
+            url = f"https://api.massive.com/v2/aggs/ticker/{symbol}/range/1/day/{from_dt.strftime('%Y-%m-%d')}/{to_dt.strftime('%Y-%m-%d')}"
+            r = requests.get(url, params={"apiKey": MASSIVE_API_KEY})
+            data = r.json()
+            if 'results' not in data or not data['results']: return
+            df = pd.DataFrame(data['results'])
+            df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close', 'v': 'volume', 't': 'timestamp'}, inplace=True)
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('timestamp', inplace=True)
             for c in ['open','high','low','close','volume']: df[c] = df[c].astype(float)
         else:
@@ -267,5 +281,6 @@ if __name__ == "__main__":
         gold_data, usd_data = fetch_macro_data()
         for s in stocks.data:
             is_crypto = (s['sector'] == 'Crypto' or s['candle_table_name'] == 'API')
-            process_symbol(s['symbol'], s['candle_table_name'], gold_data, usd_data, is_crypto)
+            is_finnhub = (s['candle_table_name'] == 'API_FINNHUB')
+            process_symbol(s['symbol'], s['candle_table_name'], gold_data, usd_data, is_crypto, is_finnhub)
     print("\n🏁 Pipeline Completed!")
