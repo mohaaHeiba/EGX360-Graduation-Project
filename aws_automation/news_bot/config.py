@@ -22,6 +22,17 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
+# Multiple Groq API keys for rate-limit rotation
+GROQ_API_KEYS = [
+    key for key in [
+        os.getenv("GROQ_API_KEY"),
+        os.getenv("GROQ_API_KEY_2"),
+    ] if key  # Filter out None/empty keys
+]
+
+# Delay (in seconds) between consecutive API requests to avoid rate limits
+REQUEST_DELAY_SECONDS = 2
+
 
 # crypto feeds
 CRYPTO_FEEDS = [

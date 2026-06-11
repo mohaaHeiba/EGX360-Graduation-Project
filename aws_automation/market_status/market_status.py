@@ -105,10 +105,45 @@ def fetch_market_data():
 
         # --- 1. Market Cap ---
         try:
-            cap_element = driver.find_element(By.ID, "ctl00_C_HomeMarketsummary2_lclTotalMC")
-            market_cap_final = format_large_number(cap_element.text)
+            print("   [DEBUG] Starting Market Cap extraction...")
+            raw_text = ""
+            # Wait up to 10 seconds for the element to load and have text
+            for i in range(10):
+                try:
+                    print(f"   [DEBUG] ID poll {i+1}/10...")
+                    cap_element = driver.find_element(By.ID, "ctl00_C_HomeMarketsummary2_lclTotalMC")
+                    print("   [DEBUG] Found ID element, getting text...")
+                    text_content = cap_element.get_attribute("textContent")
+                    visible_text = cap_element.text
+                    raw_text = (text_content or visible_text).strip()
+                    if raw_text:
+                        print(f"   [DEBUG] Got raw_text: {raw_text}")
+                        break
+                except Exception as e:
+                    print(f"   [DEBUG] ID poll {i+1} failed: {type(e).__name__}")
+                time.sleep(1)
+
+            # Fallback if ID strategy completely fails or is empty
+            if not raw_text:
+                print("   [DEBUG] ID strategy empty, trying XPath fallback...")
+                mc_labels = driver.find_elements(By.XPATH, "//*[contains(text(), 'رأس المال السوق')]")
+                print(f"   [DEBUG] Found {len(mc_labels)} labels via XPath")
+                for idx, label in enumerate(mc_labels):
+                    print(f"   [DEBUG] Processing label {idx+1}/{len(mc_labels)}...")
+                    parent_text = label.find_element(By.XPATH, "..").get_attribute("textContent")
+                    parts = parent_text.split()
+                    # Extract the last number in the parent element
+                    numbers = [p for p in parts if re.match(r'^[\d,]+(\.\d+)?$', p)]
+                    if numbers:
+                        raw_text = numbers[-1]
+                        print(f"   [DEBUG] Found raw_text in label: {raw_text}")
+                        break
+
+            print("   [DEBUG] Formatting number...")
+            market_cap_final = format_large_number(raw_text) if raw_text else "0"
             print(f"   💰 Market Cap: {market_cap_final}")
-        except: print("   ❌ Market Cap Error")
+        except Exception as e: 
+            print(f"   ❌ Market Cap Error: {e}")
 
         # --- 2. Value Traded ---
         try:
