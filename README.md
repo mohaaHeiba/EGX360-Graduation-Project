@@ -398,14 +398,13 @@ flutter build linux --release      # Linux Desktop
 
 ### 🎓 Learn — Academy (Duolingo-style)
 
-![Academy — Lesson Map (locked)](assets/image/dektop/1.jpg)
-*Academy — Lesson Map (locked state)*
-
-![Academy — Lesson Map with Progress & XP](assets/image/dektop/2.jpg)
-*Academy — Lesson Map (with progress & XP streak)*
-
-![Academy — Lesson Content](assets/image/dektop/3.jpg)
-*Academy — Lesson Content (Hours & Sessions)*
+<table>
+  <tr>
+    <td align="center"><img src="assets/image/dektop/1.jpg" width="100%"/><br/><sub>Academy — Lesson Map (locked)</sub></td>
+    <td align="center"><img src="assets/image/dektop/2.jpg" width="100%"/><br/><sub>Academy — Lesson Map (with XP streak)</sub></td>
+    <td align="center"><img src="assets/image/dektop/3.jpg" width="100%"/><br/><sub>Academy — Lesson Content</sub></td>
+  </tr>
+</table>
 
 ---
 
