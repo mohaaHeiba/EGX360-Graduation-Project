@@ -412,9 +412,9 @@ flutter build linux --release      # Linux Desktop
 
 **Developer**: Mohamed Heiba
 **GitHub**: [@mohaaHeiba](https://github.com/mohaaHeiba)
-**Institution**: Kafr El-Sheikh University (KSIU)
-**Email**: mohamed222101223@ksiu.edu.eg
-**Academic Year**: 2024–2025
+**Institution**: king salman international university (KSIU)
+**Email**: mohamedheiba88998@gmail.com
+**Academic Year**: 2025–2026
 
 ---
 
@@ -441,6 +441,6 @@ This project is developed as a graduation project for academic purposes.
 
 <div align="center">
 
-**EGX 360** · Built with ❤️ using Flutter · 2024–2025
+**EGX 360** · Built with ❤️ using Flutter · 2025–2026
 
 </div>
