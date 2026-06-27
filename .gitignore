@@ -1,2 +1,47 @@
 venv
 venv_egx360
+
+# ── Secrets & Credentials ──────────────────────────────────────────────────────
+.env
+*.env
+aws/.env
+aws_automation/.env
+
+# Firebase service account (all locations)
+service_account.json
+**/service_account.json
+
+# Firebase generated config
+firebase_options.dart
+**/firebase_options.dart
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+
+# AWS SSH private keys
+*.pem
+MyNewsBotKey.pem
+
+# AWS setup notes with credentials
+create_aws_server.txt
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Flutter / Dart ─────────────────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.iml
+
+# ── IDE ────────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
